@@ -8,80 +8,61 @@
   />
   <title>Henric Piccardt Tour</title>
   <meta name="theme-color" content="#1d1d1b" />
+
+  <!-- ElevenLabs widget (official embed) -->
+  <script src="https://unpkg.com/@elevenlabs/convai-widget-embed" defer></script>
+
   <style>
-    :root {
-      --vh: 1vh;
-      --safe-bottom: env(safe-area-inset-bottom, 0px);
-    }
+    :root { --vh: 1vh; --safe-bottom: env(safe-area-inset-bottom, 0px); }
     html, body {
       height: calc(var(--vh) * 100);
-      margin: 0;
-      padding: 0;
-      overflow: hidden;
+      margin: 0; padding: 0; overflow: hidden;
       font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
     }
 
     /* Background image */
     .bg {
-      position: fixed;
-      inset: 0;
+      position: fixed; inset: 0;
       background: url("Background 1.png") center center / cover no-repeat;
       transition: background-image .5s ease;
     }
-    .bg.conversation {
-      background-image: url("Background Conversation.png");
-    }
+    .bg.conversation { background-image: url("Background Conversation.png"); }
 
-    /* Permission Gate */
+    /* Permission Gate (lower & centered so more background is visible) */
     .gate {
-      position: fixed;
-      inset: 0;
-      display: flex;
-      justify-content: center;
-      align-items: flex-end; /* lower placement */
-      padding-bottom: 18%;   /* ~lower third */
-      z-index: 20;
-      background: rgba(0,0,0,0.12);
+      position: fixed; inset: 0;
+      display: flex; justify-content: center; align-items: flex-end;
+      padding-bottom: 18%;
+      z-index: 20; background: rgba(0,0,0,0.12);
     }
     .card {
       width: min(90vw, 420px);
       border-radius: 18px;
       background: rgba(255,255,255,0.95);
       box-shadow: 0 12px 40px rgba(0,0,0,.25);
-      padding: 18px;
-      text-align: center;
+      padding: 18px; text-align: center;
     }
     .card h1 { font-size: 1.1rem; margin: 6px 0 10px; }
-    .card p { font-size: .95rem; margin: 0 0 12px; }
+    .card p  { font-size: .95rem; margin: 0 0 12px; }
     .row { display: flex; gap: 10px; }
     .btn {
-      flex: 1 1 auto;
-      padding: 12px 14px;
-      border-radius: 12px;
-      border: 2px solid transparent;
-      font-weight: 600;
-      cursor: pointer;
+      flex: 1 1 auto; padding: 12px 14px;
+      border-radius: 12px; border: 2px solid transparent;
+      font-weight: 600; cursor: pointer;
     }
     .btn-allow { background: #0b6efd; color: #fff; }
-    .btn-deny { background: #eee; color: #111; }
+    .btn-deny  { background: #eee; color: #111; }
+    .hidden { display: none !important; }
 
-    .hidden { display:none !important; }
-
-    /* Widget container */
+    /* Widget container (bottom center) */
     .widget-container {
       position: fixed;
       bottom: calc(var(--safe-bottom) + 10px);
-      left: 50%;
-      transform: translateX(-50%);
-      width: 92%;
-      max-width: 480px;
-      z-index: 10;
+      left: 50%; transform: translateX(-50%);
+      width: 92%; max-width: 480px; z-index: 10;
     }
     .widget-container > elevenlabs-convai,
-    .widget-container iframe {
-      width: 100%;
-      height: 120px;
-    }
+    .widget-container iframe { width: 100%; height: 120px; }
   </style>
 </head>
 <body>
@@ -99,59 +80,40 @@
     </div>
   </div>
 
-  <!-- Where ElevenLabs widget will mount -->
+  <!-- Where the ElevenLabs widget mounts -->
   <div class="widget-container hidden" id="widgetContainer"></div>
 
   <script>
     const AGENT_ID = "agent_4401k3npmamcf5hawj56bagnz96v";
-    const ELEVEN_SCRIPT_URL = "https://unpkg.com/@elevenlabs/convai-widget-embed";
 
-    const bg   = document.getElementById("bg");
+    const bg = document.getElementById("bg");
     const gate = document.getElementById("gate");
     const allowBtn = document.getElementById("allowBtn");
     const denyBtn = document.getElementById("denyBtn");
     const widgetContainer = document.getElementById("widgetContainer");
 
-    function loadElevenLabs() {
-      return new Promise((resolve, reject) => {
-        if (customElements.get("elevenlabs-convai")) return resolve();
-        const s = document.createElement("script");
-        s.src = ELEVEN_SCRIPT_URL;
-        s.async = true;
-        s.onload = resolve;
-        s.onerror = () => reject(new Error("Failed to load ElevenLabs widget."));
-        document.head.appendChild(s);
-      });
-    }
-
     async function startExperience() {
       try {
-        // ask for mic permission
         await navigator.mediaDevices.getUserMedia({ audio: true });
       } catch {
         alert("Microphone permission denied. Please enable it to use the voice tour.");
         return;
       }
-
-      // change background to portrait
+      // Change background to the portrait + hide permission
       bg.classList.add("conversation");
-
-      // hide permission box
       gate.classList.add("hidden");
 
-      // load & mount ElevenLabs widget
-      await loadElevenLabs();
+      // Mount the ElevenLabs widget (per docs)
       widgetContainer.innerHTML = `<elevenlabs-convai agent-id="${AGENT_ID}"></elevenlabs-convai>`;
       widgetContainer.classList.remove("hidden");
     }
 
     allowBtn.addEventListener("click", startExperience);
-    denyBtn.addEventListener("click", () => {
-      gate.classList.add("hidden");
-    });
+    denyBtn.addEventListener("click", () => gate.classList.add("hidden"));
 
-    // viewport height fix
-    const setVH = () => document.documentElement.style.setProperty("--vh", `${window.innerHeight * 0.01}px`);
+    // 100vh mobile fix
+    const setVH = () =>
+      document.documentElement.style.setProperty("--vh", `${window.innerHeight * 0.01}px`);
     setVH(); window.addEventListener("resize", setVH);
   </script>
 </body>
