@@ -38,8 +38,8 @@
       inset: 0;
       display: flex;
       justify-content: center;
-      align-items: flex-end; /* lower placement */
-      padding-bottom: 18%;   /* ~lower third */
+      align-items: flex-end;
+      padding-bottom: 18%;
       z-index: 20;
       background: rgba(0,0,0,0.12);
     }
@@ -80,7 +80,7 @@
     .widget-container > elevenlabs-convai,
     .widget-container iframe {
       width: 100%;
-      height: 120px;
+      height: 140px;
     }
   </style>
 </head>
@@ -104,7 +104,6 @@
 
   <script>
     const AGENT_ID = "agent_4401k3npmamcf5hawj56bagnz96v";
-    const ELEVEN_SCRIPT_URL = "https://unpkg.com/@elevenlabs/convai-widget-embed";
 
     const bg   = document.getElementById("bg");
     const gate = document.getElementById("gate");
@@ -112,16 +111,16 @@
     const denyBtn = document.getElementById("denyBtn");
     const widgetContainer = document.getElementById("widgetContainer");
 
-    function loadElevenLabs() {
-      return new Promise((resolve, reject) => {
-        if (customElements.get("elevenlabs-convai")) return resolve();
-        const s = document.createElement("script");
-        s.src = ELEVEN_SCRIPT_URL;
-        s.async = true;
-        s.onload = resolve;
-        s.onerror = () => reject(new Error("Failed to load ElevenLabs widget."));
-        document.head.appendChild(s);
-      });
+    function injectWidget() {
+      if (!document.querySelector('script[src*="elevenlabs.io/convai-widget/index.js"]')) {
+        const script = document.createElement("script");
+        script.src = "https://elevenlabs.io/convai-widget/index.js";
+        script.async = true;
+        script.setAttribute("data-elevenlabs-convai", "true");
+        document.body.appendChild(script);
+      }
+      widgetContainer.innerHTML = `<elevenlabs-convai agent-id="${AGENT_ID}"></elevenlabs-convai>`;
+      widgetContainer.classList.remove("hidden");
     }
 
     async function startExperience() {
@@ -140,9 +139,7 @@
       gate.classList.add("hidden");
 
       // load & mount ElevenLabs widget
-      await loadElevenLabs();
-      widgetContainer.innerHTML = `<elevenlabs-convai agent-id="${AGENT_ID}"></elevenlabs-convai>`;
-      widgetContainer.classList.remove("hidden");
+      injectWidget();
     }
 
     allowBtn.addEventListener("click", startExperience);
