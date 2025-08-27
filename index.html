@@ -6,7 +6,7 @@
     name="viewport"
     content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no"
   />
-  <title>Fraeylemaborg – Audio Tour</title>
+  <title>Henric Piccardt Tour</title>
   <meta name="theme-color" content="#1d1d1b" />
   <style>
     :root {
@@ -25,7 +25,11 @@
     .bg {
       position: fixed;
       inset: 0;
-      background: url("Background 1.png") center center / cover no-repeat fixed;
+      background: url("Background 1.png") center center / cover no-repeat;
+      transition: background-image .5s ease;
+    }
+    .bg.conversation {
+      background-image: url("Background Conversation.png");
     }
 
     /* Permission Gate */
@@ -34,10 +38,10 @@
       inset: 0;
       display: flex;
       justify-content: center;
-      align-items: flex-end; /* push lower */
-      padding-bottom: 20%;   /* ~lower third of the screen */
+      align-items: flex-end; /* lower placement */
+      padding-bottom: 18%;   /* ~lower third */
       z-index: 20;
-      background: rgba(0,0,0,0.15);
+      background: rgba(0,0,0,0.12);
     }
     .card {
       width: min(90vw, 420px);
@@ -76,12 +80,12 @@
     .widget-container > elevenlabs-convai,
     .widget-container iframe {
       width: 100%;
-      height: 120px; /* taller for usability */
+      height: 120px;
     }
   </style>
 </head>
 <body>
-  <div class="bg"></div>
+  <div class="bg" id="bg"></div>
 
   <!-- Permission Gate -->
   <div class="gate" id="gate" role="dialog" aria-modal="true" aria-labelledby="gateTitle">
@@ -102,6 +106,7 @@
     const AGENT_ID = "agent_4401k3npmamcf5hawj56bagnz96v";
     const ELEVEN_SCRIPT_URL = "https://unpkg.com/@elevenlabs/convai-widget-embed";
 
+    const bg   = document.getElementById("bg");
     const gate = document.getElementById("gate");
     const allowBtn = document.getElementById("allowBtn");
     const denyBtn = document.getElementById("denyBtn");
@@ -121,16 +126,20 @@
 
     async function startExperience() {
       try {
+        // ask for mic permission
         await navigator.mediaDevices.getUserMedia({ audio: true });
       } catch {
         alert("Microphone permission denied. Please enable it to use the voice tour.");
         return;
       }
 
-      // hide gate
+      // change background to portrait
+      bg.classList.add("conversation");
+
+      // hide permission box
       gate.classList.add("hidden");
 
-      // load & mount widget
+      // load & mount ElevenLabs widget
       await loadElevenLabs();
       widgetContainer.innerHTML = `<elevenlabs-convai agent-id="${AGENT_ID}"></elevenlabs-convai>`;
       widgetContainer.classList.remove("hidden");
@@ -141,7 +150,7 @@
       gate.classList.add("hidden");
     });
 
-    // viewport height fix for mobile
+    // viewport height fix
     const setVH = () => document.documentElement.style.setProperty("--vh", `${window.innerHeight * 0.01}px`);
     setVH(); window.addEventListener("resize", setVH);
   </script>
