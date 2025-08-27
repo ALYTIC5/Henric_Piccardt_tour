@@ -29,7 +29,7 @@
       transition: background-image .5s ease;
     }
     .bg.conversation {
-      background-image: url("Background Conversation.png");
+      background-image: url("Background_convo.png");
     }
 
     /* Permission Gate */
@@ -102,6 +102,9 @@
   <!-- Where ElevenLabs widget will mount -->
   <div class="widget-container hidden" id="widgetContainer"></div>
 
+  <!-- Background Music -->
+  <audio id="bgMusic" src="Background Music.mp3" loop></audio>
+
   <script>
     const AGENT_ID = "agent_4401k3npmamcf5hawj56bagnz96v";
 
@@ -110,6 +113,7 @@
     const allowBtn = document.getElementById("allowBtn");
     const denyBtn = document.getElementById("denyBtn");
     const widgetContainer = document.getElementById("widgetContainer");
+    const bgMusic = document.getElementById("bgMusic");
 
     function injectWidget() {
       if (!document.querySelector('script[src*="elevenlabs.io/convai-widget/index.js"]')) {
@@ -137,6 +141,9 @@
 
       // hide permission box
       gate.classList.add("hidden");
+
+      // play background music
+      bgMusic.play().catch(err => console.log("Autoplay blocked:", err));
 
       // load & mount ElevenLabs widget
       injectWidget();
