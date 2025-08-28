@@ -108,27 +108,27 @@
     const widgetContainer = document.getElementById("widgetContainer");
     const bgMusic = document.getElementById("bgMusic");
 
-    let talkInterval = null;
-    let talkToggle = false;
+    let cycleInterval = null;
+
+    const talkImages = ["bg_talk_1.png", "bg_talk_2.png", "bg_talk_3.png"];
+    const listenImages = ["bg_listen_2.png", "bg_listen_3.png", "bg_listen_4.png"];
 
     function setBackground(img) {
       bg.style.backgroundImage = `url('${img}')`;
     }
 
-    function startTalkingCycle() {
-      stopTalkingCycle();
-      talkToggle = false;
-      setBackground("bg_talk_1.png");
-      talkInterval = setInterval(() => {
-        talkToggle = !talkToggle;
-        setBackground(talkToggle ? "bg_talk_2.png" : "bg_talk_1.png");
-      }, 3000);
+    function startCycle(images) {
+      stopCycle();
+      setBackground(images[Math.floor(Math.random() * images.length)]);
+      cycleInterval = setInterval(() => {
+        setBackground(images[Math.floor(Math.random() * images.length)]);
+      }, 1500); // change image every 1.5s
     }
 
-    function stopTalkingCycle() {
-      if (talkInterval) {
-        clearInterval(talkInterval);
-        talkInterval = null;
+    function stopCycle() {
+      if (cycleInterval) {
+        clearInterval(cycleInterval);
+        cycleInterval = null;
       }
     }
 
@@ -138,15 +138,13 @@
         if (!root) return;
         const observer = new MutationObserver(() => {
           const txt = root.textContent.toLowerCase();
-          // console.log("Widget status text:", txt);
 
           if (txt.includes("listening")) {
-            stopTalkingCycle();
-            setBackground("bg_listen_3.png");
+            startCycle(listenImages);
           } else if (txt.includes("talk to interrupt")) {
-            startTalkingCycle();
+            startCycle(talkImages);
           } else {
-            stopTalkingCycle();
+            stopCycle();
             setBackground("background_convo.png");
           }
         });
