@@ -15,32 +15,35 @@
       padding: 0;
       overflow: hidden;
       font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-      background: #000; /* fallback */
+      background: #000;
     }
 
-    /* Single background layer (instant swap) */
+    /* Background layer */
     #bg {
       position: fixed;
       inset: 0;
       background: center center / cover no-repeat;
+      transition: background-position 0.4s ease;
+    }
+    /* After permission shift */
+    #bg.offset {
+      background-position: center calc(50% + 10px);
     }
 
-    /* Nameplate (fade in after permission granted) */
+    /* Nameplate */
     #nameplate {
       position: fixed;
-      top: 0px;                /* pushed even higher (was 8px) */
+      top: 0px;
       left: 50%;
       transform: translateX(-50%);
       max-width: 70%;
       height: auto;
       z-index: 15;
       pointer-events: none;
-      opacity: 0;              /* start invisible */
-      transition: opacity 1.2s ease-in; /* fade in effect */
+      opacity: 0;
+      transition: opacity 1.2s ease-in;
     }
-    #nameplate.visible {
-      opacity: 1;
-    }
+    #nameplate.visible { opacity: 1; }
     .hidden { display: none !important; }
 
     /* Permission gate */
@@ -123,13 +126,9 @@
   </style>
 </head>
 <body>
-  <!-- Background image with the venue name -->
   <div id="bg" style="background-image:url('Background 1.png')"></div>
-
-  <!-- Nameplate (ornate golden text PNG with transparent bg) -->
   <img id="nameplate" src="name-removebg.png" alt="Henric Piccardt" />
 
-  <!-- Permission Gate -->
   <div class="gate" id="gate" role="dialog" aria-modal="true" aria-labelledby="gateTitle">
     <div class="card">
       <h1 id="gateTitle">Microfoon inschakelen?</h1>
@@ -145,7 +144,6 @@
     </div>
   </div>
 
-  <!-- Privacy Dialog -->
   <dialog id="privacyDialog" class="privacy" aria-labelledby="privacyTitle">
     <div class="dialog-header">
       <h2 class="dialog-title" id="privacyTitle">🌐 Uitgebreider privacy statement</h2>
@@ -171,8 +169,6 @@ Contact: support@finetune.audio
   </dialog>
 
   <div class="widget-container hidden" id="widgetContainer"></div>
-
-  <!-- Background music -->
   <audio id="bgMusic" src="Background Music.mp3" loop preload="auto" playsinline webkit-playsinline></audio>
 
   <script>
@@ -185,23 +181,16 @@ Contact: support@finetune.audio
     const bgMusic = document.getElementById("bgMusic");
     const nameplate = document.getElementById("nameplate");
 
-    // Privacy dialog hooks
+    // Privacy dialog
     const privacyDialog = document.getElementById("privacyDialog");
-    const openPrivacy = document.getElementById("openPrivacy");
-    const closePrivacy = document.getElementById("closePrivacy");
+    document.getElementById("openPrivacy").addEventListener("click", () => privacyDialog.showModal());
+    document.getElementById("closePrivacy").addEventListener("click", () => privacyDialog.close());
 
-    openPrivacy.addEventListener("click", () => privacyDialog.showModal());
-    openPrivacy.addEventListener("keydown", (e) => {
-      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); privacyDialog.showModal(); }
-    });
-    closePrivacy.addEventListener("click", () => privacyDialog.close());
-
-    // Background images
+    // Background cycling
     let cycleInterval = null;
     const talkImages   = ["bg_talk_1.png","bg_talk_2.png","bg_talk_3.png"];
     const listenImages = ["bg_listen_2.png","bg_listen_3.png","bg_listen_4.png"];
     const allImages    = ["Background 1.png","background_convo.png",...talkImages,...listenImages];
-
     allImages.forEach(src => { const i = new Image(); i.src = src; });
 
     function setBackground(img) {
@@ -251,6 +240,7 @@ Contact: support@finetune.audio
       attachFallbackWatcher(widget);
     }
 
+    // Background music setup
     let audioCtx, bgGainNode;
     function setupAudio() {
       if (!audioCtx) {
@@ -260,9 +250,7 @@ Contact: support@finetune.audio
         const src = audioCtx.createMediaElementSource(bgMusic);
         src.connect(bgGainNode).connect(audioCtx.destination);
       }
-      if (audioCtx.state === "suspended") {
-        audioCtx.resume().catch(()=>{});
-      }
+      if (audioCtx.state === "suspended") audioCtx.resume().catch(()=>{});
     }
 
     async function startExperience() {
@@ -275,7 +263,10 @@ Contact: support@finetune.audio
 
       gate.classList.add("hidden");
 
-      // Fade in ornate nameplate 3 seconds after permission
+      // Shift all backgrounds down 10px
+      bg.classList.add("offset");
+
+      // Show nameplate with fade after 3s
       setTimeout(() => {
         nameplate.classList.add("visible");
       }, 3000);
