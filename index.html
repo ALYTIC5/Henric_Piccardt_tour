@@ -18,16 +18,11 @@
       background: #000; /* fallback */
     }
 
-    /* Background crossfade layers */
-    .bg-layer {
+    /* Just one background layer now */
+    #bg {
       position: fixed;
       inset: 0;
       background: center center / cover no-repeat;
-      opacity: 0;
-      transition: opacity 0.8s ease-in-out;
-    }
-    .bg-layer.visible {
-      opacity: 1;
     }
 
     .gate {
@@ -81,9 +76,8 @@
   </style>
 </head>
 <body>
-  <!-- Two layers for smooth crossfade -->
-  <div id="bgA" class="bg-layer visible" style="background-image:url('Background 1.png')"></div>
-  <div id="bgB" class="bg-layer"></div>
+  <!-- Single background layer -->
+  <div id="bg" style="background-image:url('Background 1.png')"></div>
 
   <div class="gate" id="gate" role="dialog" aria-modal="true" aria-labelledby="gateTitle">
     <div class="card">
@@ -102,41 +96,32 @@
 
   <script>
     const AGENT_ID = "agent_4401k3npmamcf5hawj56bagnz96v";
+    const bg = document.getElementById("bg");
     const gate = document.getElementById("gate");
     const allowBtn = document.getElementById("allowBtn");
     const denyBtn = document.getElementById("denyBtn");
     const widgetContainer = document.getElementById("widgetContainer");
     const bgMusic = document.getElementById("bgMusic");
 
-    const bgA = document.getElementById("bgA");
-    const bgB = document.getElementById("bgB");
-    let showingA = true;
     let cycleInterval = null;
 
     const talkImages   = ["bg_talk_1.png","bg_talk_2.png","bg_talk_3.png"];
     const listenImages = ["bg_listen_2.png","bg_listen_3.png","bg_listen_4.png"];
     const allImages    = ["Background 1.png","background_convo.png",...talkImages,...listenImages];
 
-    // Preload images to avoid flicker
+    // Preload images
     allImages.forEach(src => { const img = new Image(); img.src = src; });
 
-    function fadeBackground(newImg) {
-      const next = showingA ? bgB : bgA;
-      const prev = showingA ? bgA : bgB;
-
-      next.style.backgroundImage = `url('${newImg}')`;
-      next.classList.add("visible");
-      prev.classList.remove("visible");
-
-      showingA = !showingA;
+    function setBackground(img) {
+      bg.style.backgroundImage = `url('${img}')`;
     }
 
     function startCycle(images) {
       stopCycle();
-      fadeBackground(images[Math.floor(Math.random() * images.length)]);
+      setBackground(images[Math.floor(Math.random() * images.length)]);
       cycleInterval = setInterval(() => {
-        fadeBackground(images[Math.floor(Math.random() * images.length)]);
-      }, 1600);
+        setBackground(images[Math.floor(Math.random() * images.length)]);
+      }, 1200); // change every 1.2s
     }
 
     function stopCycle() {
@@ -160,7 +145,7 @@
             startCycle(talkImages);
           } else {
             stopCycle();
-            fadeBackground("background_convo.png");
+            setBackground("background_convo.png");
           }
         });
         observer.observe(root, { subtree: true, characterData: true, childList: true });
