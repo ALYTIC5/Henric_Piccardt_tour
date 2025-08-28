@@ -118,105 +118,55 @@
     let talkInterval = null;
     let talkToggle = false;
 
-    const setBG = (file) => { bg.style.backgroundImage = `url('${file}')`; };
-    const startTalkingCycle = () => {
-      stopTalkingCycle();
+    function setBackground(img) {
+      bg.style.backgroundImage = `url('${img}')`;
+    }
+    function startTalking() {
+      stopTalking();
       talkToggle = false;
-      setBG("bg_talk_1.png");
+      setBackground("bg_talk_1.png");
       talkInterval = setInterval(() => {
         talkToggle = !talkToggle;
-        setBG(talkToggle ? "bg_talk_2.png" : "bg_talk_1.png");
+        setBackground(talkToggle ? "bg_talk_2.png" : "bg_talk_1.png");
       }, 3000);
-    };
-    const stopTalkingCycle = () => {
-      if (talkInterval) { clearInterval(talkInterval); talkInterval = null; }
-    };
-
-    // --- Robust state handling from widget ---
-    function handleMode(mode) {
-      if (mode === "speaking") {
-        startTalkingCycle();
-      } else if (mode === "listening") {
-        stopTalkingCycle();
-        setBG("bg_listen_3.png");
-      } else {
-        stopTalkingCycle();
-        setBG("background_convo.png");
+    }
+    function stopTalking() {
+      if (talkInterval) {
+        clearInterval(talkInterval);
+        talkInterval = null;
       }
     }
 
-    // Fallback: observe widget text (listening/speaking) if callbacks aren't enabled
-    function attachStatusFallback(widgetEl) {
-      try {
-        // Ensure the widget shows known labels so we can detect them
-        widgetEl.setAttribute("listening-text", "Listening...");
-        widgetEl.setAttribute("speaking-text", "Assistant speaking");
-
-        const tryWatch = () => {
-          const root = widgetEl.shadowRoot;
-          if (!root) return; // closed shadow -> fallback won't run
-
-          const observer = new MutationObserver(() => {
-            // Search for the status label inside the widget
-            const text = root.textContent || "";
-            if (text.includes("Assistant speaking")) {
-              handleMode("speaking");
-            } else if (text.includes("Listening...")) {
-              handleMode("listening");
-            }
-          });
-          observer.observe(root, { subtree: true, childList: true, characterData: true });
-        };
-
-        // Wait a tick for custom element to upgrade
-        setTimeout(tryWatch, 200);
-      } catch (_) { /* swallow */ }
-    }
-
-    // Load the current official embed (per docs) and mount widget
     function injectWidget() {
-      // If the custom element isn't defined, load the official bundle
-      const ensureEmbed = (onReady) => {
-        if (window.customElements && customElements.get("elevenlabs-convai")) {
-          onReady(); return;
-        }
+      if (!document.querySelector('script[src*="elevenlabs.io/convai-widget/index.js"]')) {
         const script = document.createElement("script");
-        script.src = "https://unpkg.com/@elevenlabs/convai-widget-embed";
+        script.src = "https://elevenlabs.io/convai-widget/index.js";
         script.async = true;
-        script.type = "text/javascript";
-        script.onload = onReady;
+        script.setAttribute("data-elevenlabs-convai", "true");
         document.body.appendChild(script);
-      };
+      }
+      widgetContainer.innerHTML = `<elevenlabs-convai agent-id="${AGENT_ID}" style="--voice-volume:1;"></elevenlabs-convai>`;
+      widgetContainer.classList.remove("hidden");
 
-      ensureEmbed(() => {
-        widgetContainer.innerHTML = `
-          <elevenlabs-convai
-            agent-id="${AGENT_ID}"
-            style="--voice-volume:1;"
-            variant="expanded"
-          ></elevenlabs-convai>`;
-        widgetContainer.classList.remove("hidden");
-
-        const widget = widgetContainer.querySelector("elevenlabs-convai");
-
-        // 1) Primary: use documented call event to inject callbacks/tools
-        widget.addEventListener("elevenlabs-convai:call", (event) => {
-          // Hook mode changes reported by the underlying JS SDK
-          event.detail.config.onModeChange = ({ mode }) => handleMode(mode);
-          // Also reset to convo background when connected/disconnected
-          event.detail.config.onConnect = () => setBG("background_convo.png");
-          event.detail.config.onDisconnect = () => { stopTalkingCycle(); setBG("background_convo.png"); };
-          // (Client tools can still be added here if you use them)
-        });
-
-        // 2) Fallback watcher in case onModeChange isn't enabled on the agent
-        attachStatusFallback(widget);
+      const widget = widgetContainer.querySelector("elevenlabs-convai");
+      widget.addEventListener("elevenlabs-convai:call", (event) => {
+        // inject mode change callback
+        event.detail.config.onModeChange = ({ mode }) => {
+          if (mode === "speaking") {
+            startTalking();
+          } else if (mode === "listening") {
+            stopTalking();
+            setBackground("bg_listen_3.png");
+          } else {
+            stopTalking();
+            setBackground("background_convo.png");
+          }
+        };
       });
     }
 
     async function startExperience() {
       try {
-        // ask for mic permission
         await navigator.mediaDevices.getUserMedia({ audio: true });
       } catch {
         alert("Microphone permission denied. Please enable it to use the voice tour.");
@@ -224,8 +174,8 @@
       }
 
       // change background to conversation
-      bg.classList.add("conversation");     // keeps your original class-based image
-      setBG("background_convo.png");        // and force inline, so swaps can override
+      bg.classList.add("conversation");
+      setBackground("background_convo.png");
 
       // hide permission box
       gate.classList.add("hidden");
