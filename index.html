@@ -138,10 +138,12 @@
         if (!root) return;
         const observer = new MutationObserver(() => {
           const txt = root.textContent.toLowerCase();
+          // console.log("Widget status text:", txt);
+
           if (txt.includes("listening")) {
             stopTalkingCycle();
             setBackground("bg_listen_3.png");
-          } else if (txt.includes("speaking")) {
+          } else if (txt.includes("talk to interrupt")) {
             startTalkingCycle();
           } else {
             stopTalkingCycle();
