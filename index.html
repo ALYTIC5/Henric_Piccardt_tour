@@ -21,12 +21,18 @@
       font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
     }
 
-    .bg {
+    .bg-layer {
       position: fixed;
       inset: 0;
-      background: url("Background 1.png") center center / cover no-repeat;
-      transition: background-image .5s ease;
+      background: center center / cover no-repeat;
+      opacity: 0;
+      transition: opacity 0.6s ease; /* fade duration */
+      z-index: 0;
     }
+    .bg-layer.visible {
+      opacity: 1;
+    }
+
     .bg.conversation {
       background-image: url("background_convo.png");
     }
@@ -82,7 +88,9 @@
   </style>
 </head>
 <body>
-  <div class="bg" id="bg"></div>
+  <!-- Two background layers for crossfade -->
+  <div class="bg-layer visible" id="bgA" style="background-image: url('Background 1.png');"></div>
+  <div class="bg-layer" id="bgB"></div>
 
   <div class="gate" id="gate" role="dialog" aria-modal="true" aria-labelledby="gateTitle">
     <div class="card">
@@ -101,28 +109,35 @@
 
   <script>
     const AGENT_ID = "agent_4401k3npmamcf5hawj56bagnz96v";
-    const bg = document.getElementById("bg");
     const gate = document.getElementById("gate");
     const allowBtn = document.getElementById("allowBtn");
     const denyBtn = document.getElementById("denyBtn");
     const widgetContainer = document.getElementById("widgetContainer");
     const bgMusic = document.getElementById("bgMusic");
 
+    const bgA = document.getElementById("bgA");
+    const bgB = document.getElementById("bgB");
+    let activeLayer = bgA;
+
     let cycleInterval = null;
 
     const talkImages = ["bg_talk_1.png", "bg_talk_2.png", "bg_talk_3.png"];
     const listenImages = ["bg_listen_2.png", "bg_listen_3.png", "bg_listen_4.png"];
 
-    function setBackground(img) {
-      bg.style.backgroundImage = `url('${img}')`;
+    function fadeBackground(newImg) {
+      const nextLayer = activeLayer === bgA ? bgB : bgA;
+      nextLayer.style.backgroundImage = `url('${newImg}')`;
+      nextLayer.classList.add("visible");
+      activeLayer.classList.remove("visible");
+      activeLayer = nextLayer;
     }
 
     function startCycle(images) {
       stopCycle();
-      setBackground(images[Math.floor(Math.random() * images.length)]);
+      fadeBackground(images[Math.floor(Math.random() * images.length)]);
       cycleInterval = setInterval(() => {
-        setBackground(images[Math.floor(Math.random() * images.length)]);
-      }, 1500); // change image every 1.5s
+        fadeBackground(images[Math.floor(Math.random() * images.length)]);
+      }, 1500);
     }
 
     function stopCycle() {
@@ -145,7 +160,7 @@
             startCycle(talkImages);
           } else {
             stopCycle();
-            setBackground("background_convo.png");
+            fadeBackground("background_convo.png");
           }
         });
         observer.observe(root, { subtree: true, characterData: true, childList: true });
@@ -175,9 +190,6 @@
         alert("Microphone permission denied. Please enable it to use the voice tour.");
         return;
       }
-
-      bg.classList.add("conversation");
-      setBackground("background_convo.png");
 
       gate.classList.add("hidden");
 
