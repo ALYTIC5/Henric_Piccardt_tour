@@ -115,9 +115,6 @@
     const widgetContainer = document.getElementById("widgetContainer");
     const bgMusic = document.getElementById("bgMusic");
 
-    // BACKEND-CONTROLLED VOLUME (adjust this variable in deployment)
-    const BACKEND_VOLUME = 0.15; // Set default background music volume (0.0 – 1.0)
-
     function injectWidget() {
       if (!document.querySelector('script[src*="elevenlabs.io/convai-widget/index.js"]')) {
         const script = document.createElement("script");
@@ -126,7 +123,7 @@
         script.setAttribute("data-elevenlabs-convai", "true");
         document.body.appendChild(script);
       }
-      widgetContainer.innerHTML = `<elevenlabs-convai agent-id="${AGENT_ID}"></elevenlabs-convai>`;
+      widgetContainer.innerHTML = `<elevenlabs-convai agent-id="${AGENT_ID}" style="--voice-volume:1;"></elevenlabs-convai>`;
       widgetContainer.classList.remove("hidden");
     }
 
@@ -145,8 +142,8 @@
       // hide permission box
       gate.classList.add("hidden");
 
-      // play background music with backend-controlled volume
-      bgMusic.volume = BACKEND_VOLUME;
+      // play background music at fixed volume
+      bgMusic.volume = 0.15;
       bgMusic.play().catch(err => console.log("Autoplay blocked:", err));
 
       // load & mount ElevenLabs widget
