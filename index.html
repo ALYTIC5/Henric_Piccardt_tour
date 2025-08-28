@@ -32,46 +32,6 @@
       background-image: url("background_convo.png");
     }
 
-    /* TALKING STATE EFFECTS */
-    .bg.conversation.talking {
-      animation: headBob 1.1s ease-in-out infinite;
-    }
-    @keyframes headBob {
-      0%,100% { transform: translateY(0) scale(1); }
-      50% { transform: translateY(-0.6%) scale(1.003); }
-    }
-
-    /* Mouth overlay: tweak the variables below to fit the portrait */
-    #henricMouth {
-      --mouth-x: 52.8vw;   /* horizontal center position */
-      --mouth-y: 58.2vh;   /* vertical position */
-      --mouth-w: 9vw;      /* width */
-      --mouth-h: 2.2vh;    /* height */
-
-      position: fixed;
-      left: calc(var(--mouth-x) - var(--mouth-w)/2);
-      top: calc(var(--mouth-y) - var(--mouth-h)/2);
-      width: var(--mouth-w);
-      height: var(--mouth-h);
-      border-radius: 50% / 60%;
-      background: radial-gradient(ellipse at center, rgba(60,20,10,0.9) 0%, rgba(35,10,5,0.95) 55%, rgba(0,0,0,0.95) 80%);
-      box-shadow: 0 2px 0 rgba(255,196,160,0.35) inset; /* subtle lip highlight */
-      opacity: 0; /* hidden by default */
-      transform-origin: center top;
-      z-index: 9; /* sits above background, below widget */
-      pointer-events: none;
-    }
-    .talking + #henricMouth,
-    .bg.talking ~ #henricMouth { /* show when background has .talking */
-      opacity: 1;
-      animation: mouthTalk 240ms steps(2) infinite;
-    }
-    @keyframes mouthTalk {
-      0%   { transform: scaleY(0.2); filter: blur(0.3px); }
-      50%  { transform: scaleY(1);   filter: blur(0); }
-      100% { transform: scaleY(0.35); filter: blur(0.2px); }
-    }
-
     /* Permission Gate */
     .gate {
       position: fixed;
@@ -122,28 +82,10 @@
       width: 100%;
       height: 140px;
     }
-
-    /* Volume control */
-    .volume-control {
-      position: fixed;
-      top: 10px;
-      left: 50%;
-      transform: translateX(-50%);
-      z-index: 30;
-      background: rgba(255,255,255,0.8);
-      border-radius: 12px;
-      padding: 6px 10px;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.2);
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
   </style>
 </head>
 <body>
   <div class="bg" id="bg"></div>
-  <!-- Simple mouth overlay that toggles when agent speaks -->
-  <div id="henricMouth" aria-hidden="true"></div>
 
   <!-- Permission Gate -->
   <div class="gate" id="gate" role="dialog" aria-modal="true" aria-labelledby="gateTitle">
@@ -163,12 +105,6 @@
   <!-- Background Music -->
   <audio id="bgMusic" src="Background Music.mp3" loop></audio>
 
-  <!-- Volume Control -->
-  <div class="volume-control hidden" id="volumeControl">
-    <label for="volumeRange">Volume:</label>
-    <input type="range" id="volumeRange" min="0" max="1" step="0.01" value="1">
-  </div>
-
   <script>
     const AGENT_ID = "agent_4401k3npmamcf5hawj56bagnz96v";
 
@@ -178,9 +114,9 @@
     const denyBtn = document.getElementById("denyBtn");
     const widgetContainer = document.getElementById("widgetContainer");
     const bgMusic = document.getElementById("bgMusic");
-    const mouth = document.getElementById("henricMouth");
-    const volumeControl = document.getElementById("volumeControl");
-    const volumeRange = document.getElementById("volumeRange");
+
+    // BACKEND-CONTROLLED VOLUME (adjust this variable in deployment)
+    const BACKEND_VOLUME = 0.4; // Set default background music volume (0.0 – 1.0)
 
     function injectWidget() {
       if (!document.querySelector('script[src*="elevenlabs.io/convai-widget/index.js"]')) {
@@ -192,9 +128,6 @@
       }
       widgetContainer.innerHTML = `<elevenlabs-convai agent-id="${AGENT_ID}"></elevenlabs-convai>`;
       widgetContainer.classList.remove("hidden");
-
-      // Hook up speaking/listening events from the ElevenLabs widget
-      wireConvaiSpeakingEvents();
     }
 
     async function startExperience() {
@@ -212,12 +145,9 @@
       // hide permission box
       gate.classList.add("hidden");
 
-      // play background music
-      bgMusic.volume = parseFloat(volumeRange.value);
+      // play background music with backend-controlled volume
+      bgMusic.volume = BACKEND_VOLUME;
       bgMusic.play().catch(err => console.log("Autoplay blocked:", err));
-
-      // show volume control
-      volumeControl.classList.remove("hidden");
 
       // load & mount ElevenLabs widget
       injectWidget();
@@ -228,63 +158,9 @@
       gate.classList.add("hidden");
     });
 
-    // volume adjustment
-    volumeRange.addEventListener("input", (e) => {
-      bgMusic.volume = parseFloat(e.target.value);
-    });
-
     // viewport height fix
     const setVH = () => document.documentElement.style.setProperty("--vh", `${window.innerHeight * 0.01}px`);
     setVH(); window.addEventListener("resize", setVH);
-  
-    /**
-     * Toggle portrait talking state
-     */
-    function setTalking(isTalking){
-      bg.classList.toggle('talking', !!isTalking);
-    }
-
-    /**
-     * Wire ElevenLabs Convai events -> setTalking(true/false)
-     * Tries multiple strategies to remain robust against widget updates.
-     */
-    function wireConvaiSpeakingEvents(){
-      // 1) Custom DOM events (preferred)
-      const evtNames = [
-        'elevenlabs:agent-started-speaking',
-        'elevenlabs:agent-stopped-speaking',
-        'elevenlabs:assistant-started-speaking',
-        'elevenlabs:assistant-stopped-speaking'
-      ];
-      evtNames.forEach(n => window.addEventListener(n, (e)=>{
-        const on = /started/.test(n);
-        setTalking(on);
-        console.debug('[convai]', n, e.detail||'');
-      }));
-
-      // 2) postMessage from iframe (fallback)
-      window.addEventListener('message', (event) => {
-        if (!event.origin || !/elevenlabs\.io$/.test(new URL(event.origin).host)) return;
-        const data = event.data || {};
-        const type = (data.type||data.event||'').toString();
-        if (/agent-started-speaking|assistant-started-speaking/.test(type)) setTalking(true);
-        if (/agent-stopped-speaking|assistant-stopped-speaking/.test(type)) setTalking(false);
-        if (/listening-started/.test(type)) setTalking(false);
-        if (/listening-stopped/.test(type)) setTalking(false);
-        console.debug('[convai:message]', type, data);
-      });
-
-      // 3) MutationObserver on the web component (best‑effort)
-      const el = document.querySelector('elevenlabs-convai');
-      if (el) {
-        const mo = new MutationObserver(()=>{
-          const state = el.getAttribute('data-state')||'';
-          if (/speaking/i.test(state)) setTalking(true);
-          if (/listening|idle/i.test(state)) setTalking(false);
-        });
-        mo.observe(el, { attributes:true, attributeFilter:['data-state','class'] });
-      }
-    }
   </script>
 </body>
 </html>
