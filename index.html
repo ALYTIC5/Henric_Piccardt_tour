@@ -19,18 +19,16 @@
       padding: 0;
       overflow: hidden;
       font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-      background: #161513;
     }
 
     .bg {
       position: fixed;
       inset: 0;
       background: url("Background 1.png") center center / cover no-repeat;
-      transition: background-image .45s ease;
+      transition: background-image .45s ease; /* smoother swaps */
     }
-
     .bg.conversation {
-      background-image: url("bg_listen_1.png");
+      background-image: url("background_convo.png");
     }
 
     .gate {
@@ -46,7 +44,7 @@
     .card {
       width: min(90vw, 420px);
       border-radius: 18px;
-      background: rgba(255,255,255,0.96);
+      background: rgba(255,255,255,0.95);
       box-shadow: 0 12px 40px rgba(0,0,0,.25);
       padding: 18px;
       text-align: center;
@@ -98,6 +96,7 @@
   </div>
 
   <div class="widget-container hidden" id="widgetContainer"></div>
+
   <audio id="bgMusic" src="Background Music.mp3" loop></audio>
 
   <script>
@@ -105,98 +104,162 @@
     const bg = document.getElementById("bg");
     const gate = document.getElementById("gate");
     const allowBtn = document.getElementById("allowBtn");
-    const denyBtn  = document.getElementById("denyBtn");
+    const denyBtn = document.getElementById("denyBtn");
     const widgetContainer = document.getElementById("widgetContainer");
     const bgMusic = document.getElementById("bgMusic");
 
-    // -------- IMAGE SETUP --------
-    const LISTEN_FRAMES = [
-      "bg_listen_1.png",
-      "bg_listen_2.png",
-      "bg_listen_3.png",
-      "bg_listen_4.png"
-    ];
-    const TALK_FRAMES = [
-      "bg_talk_1.png",
-      "bg_talk_2.png",
-      "bg_talk_3.png"
-    ];
-
-    const SPEED = {
-      LISTEN_IDLE_MS: 2000,   // idle frame change pace
-      LISTEN_NOD_MS: 600,     // nod step speed
-      TALK_STEP_MS: 500       // talking frame pace
+    // ---------- IMAGE & ANIMATION CONFIG ----------
+    const IMG = {
+      LISTEN_3: "bg_listening_3.png",
+      LISTEN_4: "bg_listening_4.png",
+      TALK_FRAMES: [
+        "bg_talk_1.png",
+        "bg_talk_2.png",
+        "bg_talk_3.png",
+        "bg_talk_4.png",
+        "bg_talk_5.png",
+        "bg_talk_6.png"
+      ]
     };
 
-    let listenInterval = null;
-    let nodTimeout = null;
+    const SPEED = {
+      LISTEN_STEP_MS: 520,  // slower nod cadence (was 180ms)
+      TALK_STEP_MS: 420,    // slower talk frame swap (was 110ms)
+      LISTEN_AFTER_TALK_PAUSE_MS: 350 // brief settle after talking ends
+    };
+
+    // ---------- STATE ----------
+    let state = "listening"; // "listening" | "talking"
     let talkInterval = null;
-    let isTalking = false;
+    let listenTimer = null;
 
     function setBackground(img) {
-      bg.style.backgroundImage = `url('${img}')`;
-    }
-
-    // -------- LISTENING ANIMATION --------
-    function startListening() {
-      stopTalking();
-      stopListening();
-      let i = 0;
-      setBackground(LISTEN_FRAMES[0]);
-      listenInterval = setInterval(() => {
-        if (Math.random() < 0.25) {
-          // occasionally nod instead of normal frame advance
-          playNod();
-        } else {
-          i = (i + 1) % LISTEN_FRAMES.length;
-          setBackground(LISTEN_FRAMES[i]);
-        }
-      }, SPEED.LISTEN_IDLE_MS);
-    }
-
-    function stopListening() {
-      if (listenInterval) {
-        clearInterval(listenInterval);
-        listenInterval = null;
-      }
-      if (nodTimeout) {
-        clearTimeout(nodTimeout);
-        nodTimeout = null;
+      // small guard to avoid redundant paints
+      const current = bg.style.backgroundImage || "";
+      const next = `url("${img}")`;
+      if (!current.endsWith(next.replace(/"/g, "'")) && !current.endsWith(next)) {
+        bg.style.backgroundImage = `url('${img}')`;
       }
     }
 
-    function playNod() {
-      stopListening();
-      setBackground("bg_listen_3.png");
-      nodTimeout = setTimeout(() => {
-        setBackground("bg_listen_4.png");
-        nodTimeout = setTimeout(() => {
-          setBackground("bg_listen_3.png");
-          startListening(); // resume idle listening afterwards
-        }, SPEED.LISTEN_NOD_MS);
-      }, SPEED.LISTEN_NOD_MS);
+    // ----- LISTENING NOD: 3 -> 4 -> 3 -----
+    function playListeningNod(onDone) {
+      stopListeningNod(); // clear any in-flight nod
+
+      // If state flipped to talking before we start, bail
+      if (state !== "listening") return;
+
+      setBackground(IMG.LISTEN_3);
+      listenTimer = setTimeout(() => {
+        if (state !== "listening") return; // preempted by talking
+        setBackground(IMG.LISTEN_4);
+        listenTimer = setTimeout(() => {
+          if (state !== "listening") return;
+          setBackground(IMG.LISTEN_3);
+          listenTimer = null;
+          onDone && onDone();
+        }, SPEED.LISTEN_STEP_MS);
+      }, SPEED.LISTEN_STEP_MS);
     }
 
-    // -------- TALKING ANIMATION --------
-    function startTalking() {
-      stopListening();
-      stopTalking();
+    function stopListeningNod() {
+      if (listenTimer) {
+        clearTimeout(listenTimer);
+        listenTimer = null;
+      }
+    }
+
+    // ----- TALKING ANIMATION -----
+    function startTalkingCycle() {
+      if (state === "talking") return;
+      state = "talking";
+
+      stopListeningNod();
+      stopTalkingCycle(); // ensure clean start
+
+      if (!IMG.TALK_FRAMES.length) return;
+
+      // cycle all talk frames at a natural pace
       let i = 0;
-      setBackground(TALK_FRAMES[0]);
+      setBackground(IMG.TALK_FRAMES[0]);
       talkInterval = setInterval(() => {
-        i = (i + 1) % TALK_FRAMES.length;
-        setBackground(TALK_FRAMES[i]);
+        // If state flipped back to listening, stop cycling immediately
+        if (state !== "talking") return stopTalkingCycle();
+        i = (i + 1) % IMG.TALK_FRAMES.length;
+        setBackground(IMG.TALK_FRAMES[i]);
       }, SPEED.TALK_STEP_MS);
     }
 
-    function stopTalking() {
+    function stopTalkingCycle() {
       if (talkInterval) {
         clearInterval(talkInterval);
         talkInterval = null;
       }
     }
 
-    // -------- ELEVENLABS WIDGET --------
+    // ----- STATE SWITCH HELPERS -----
+    function toTalking() {
+      if (state === "talking") return;
+      startTalkingCycle();
+    }
+
+    function toListening() {
+      if (state === "listening") return;
+      state = "listening";
+      stopTalkingCycle();
+
+      // settle briefly, then do a nod (3->4->3)
+      setTimeout(() => {
+        if (state !== "listening") return; // guard
+        playListeningNod();
+      }, SPEED.LISTEN_AFTER_TALK_PAUSE_MS);
+    }
+
+    // ---------- FALLBACK WIDGET WATCHER ----------
+    function attachFallbackWatcher(widgetEl) {
+      setTimeout(() => {
+        const root = widgetEl.shadowRoot;
+        if (!root) return;
+
+        let lastDetected = null;
+
+        const observer = new MutationObserver(() => {
+          const txt = (root.textContent || "").toLowerCase();
+
+          const speaking =
+            txt.includes("talk to interrupt") ||
+            txt.includes("speaking") ||
+            txt.includes("playing") ||
+            txt.includes("agent is talking");
+
+          const listening =
+            txt.includes("listening") ||
+            txt.includes("say something") ||
+            txt.includes("awaiting") ||
+            txt.includes("your turn");
+
+          // Only react on changes to avoid thrashing
+          const detected = speaking ? "talking" : listening ? "listening" : lastDetected;
+          if (!detected || detected === lastDetected) return;
+          lastDetected = detected;
+
+          if (detected === "talking") {
+            toTalking();
+          } else if (detected === "listening") {
+            toListening();
+          }
+        });
+
+        observer.observe(root, { subtree: true, characterData: true, childList: true });
+
+        // Start in listening pose with a gentle nod
+        state = "listening";
+        setBackground(IMG.LISTEN_3);
+        playListeningNod();
+      }, 300);
+    }
+
+    // ---------- ELEVENLABS WIDGET ----------
     function injectWidget() {
       if (!document.querySelector('script[src*="elevenlabs.io/convai-widget/index.js"]')) {
         const script = document.createElement("script");
@@ -205,36 +268,25 @@
         script.setAttribute("data-elevenlabs-convai", "true");
         document.body.appendChild(script);
       }
+
       widgetContainer.innerHTML =
         `<elevenlabs-convai agent-id="${AGENT_ID}" style="--voice-volume:1;"></elevenlabs-convai>`;
       widgetContainer.classList.remove("hidden");
 
-      const convaiEl = widgetContainer.querySelector("elevenlabs-convai");
-      bindEvents(convaiEl);
-    }
+      const widget = widgetContainer.querySelector("elevenlabs-convai");
 
-    function bindEvents(convaiEl) {
-      const onTtsStart = () => {
-        isTalking = true;
-        startTalking();
-      };
-      const onTtsStop = () => {
-        isTalking = false;
-        stopTalking();
-        startListening();
-      };
+      // Bind known events (preferred)
+      const onTtsStart = () => toTalking();
+      const onTtsStop  = () => toListening();
+      ["playback-start","speech-start","audio-start","conversation-start","agent-speaks-start"]
+        .forEach(evt => widget.addEventListener(evt, onTtsStart));
+      ["playback-complete","playback-end","speech-end","audio-end","conversation-end","agent-speaks-end","playback-error"]
+        .forEach(evt => widget.addEventListener(evt, onTtsStop));
 
-      ["playback-start","speech-start","audio-start"].forEach(e =>
-        convaiEl.addEventListener(e, onTtsStart)
-      );
-      ["playback-complete","speech-end","audio-end","playback-error"].forEach(e =>
-        convaiEl.addEventListener(e, onTtsStop)
-      );
-
-      // fallback audio detection
+      // Fallback shadow <audio> binding
       const tryBindAudio = () => {
         try {
-          const root = convaiEl.shadowRoot;
+          const root = widget.shadowRoot;
           if (!root) return false;
           const audio = root.querySelector("audio");
           if (!audio) return false;
@@ -249,29 +301,36 @@
         if (tryBindAudio() || attempts++ > 40) clearInterval(poll);
       }, 250);
 
-      startListening(); // initial state
+      attachFallbackWatcher(widget);
     }
 
-    // -------- EXPERIENCE FLOW --------
+    // ---------- EXPERIENCE FLOW ----------
     async function startExperience() {
       try {
         await navigator.mediaDevices.getUserMedia({ audio: true });
       } catch {
-        alert("Microphone permission denied.");
+        alert("Microphone permission denied. Please enable it to use the voice tour.");
         return;
       }
+
       bg.classList.add("conversation");
+      setBackground(IMG.LISTEN_3);
+
       gate.classList.add("hidden");
+
       bgMusic.volume = 0.15;
       bgMusic.play().catch(()=>{});
+
       injectWidget();
+
+      // initial nod so the character feels alive
+      playListeningNod();
     }
 
     allowBtn.addEventListener("click", startExperience);
     denyBtn.addEventListener("click", () => gate.classList.add("hidden"));
 
-    const setVH = () =>
-      document.documentElement.style.setProperty("--vh", `${window.innerHeight * 0.01}px`);
+    const setVH = () => document.documentElement.style.setProperty("--vh", `${window.innerHeight * 0.01}px`);
     setVH();
     window.addEventListener("resize", setVH);
   </script>
