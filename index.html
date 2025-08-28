@@ -23,20 +23,15 @@
       position: fixed;
       inset: 0;
       background: center center / cover no-repeat;
-      transition: background-position 0.4s ease;
-    }
-    /* After permission shift */
-    #bg.offset {
-      background-position: center calc(50% + 10px);
     }
 
-    /* Nameplate */
+    /* Nameplate (smaller now) */
     #nameplate {
       position: fixed;
       top: 0px;
       left: 50%;
       transform: translateX(-50%);
-      max-width: 70%;
+      max-width: 40%;          /* reduced size (was 70%) */
       height: auto;
       z-index: 15;
       pointer-events: none;
@@ -262,9 +257,6 @@ Contact: support@finetune.audio
       }
 
       gate.classList.add("hidden");
-
-      // Shift all backgrounds down 10px
-      bg.classList.add("offset");
 
       // Show nameplate with fade after 3s
       setTimeout(() => {
