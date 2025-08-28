@@ -20,21 +20,19 @@
       overflow: hidden;
       font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
       background: #161513;
-      color: #111;
     }
 
-    /* Background portrait image */
     .bg {
       position: fixed;
       inset: 0;
       background: url("Background 1.png") center center / cover no-repeat;
-      transition: background-image .45s ease; /* soft fade between frames */
-    }
-    .bg.conversation {
-      background-image: url("bg_listen_3.png"); /* start in neutral listening pose */
+      transition: background-image .45s ease;
     }
 
-    /* Permission Gate */
+    .bg.conversation {
+      background-image: url("bg_listen_1.png");
+    }
+
     .gate {
       position: fixed;
       inset: 0;
@@ -54,7 +52,7 @@
       text-align: center;
     }
     .card h1 { font-size: 1.1rem; margin: 6px 0 10px; }
-    .card p { font-size: .95rem; margin: 0 0 12px; color: #333; }
+    .card p { font-size: .95rem; margin: 0 0 12px; }
     .row { display: flex; gap: 10px; }
     .btn {
       flex: 1 1 auto;
@@ -65,11 +63,10 @@
       cursor: pointer;
     }
     .btn-allow { background: #0b6efd; color: #fff; }
-    .btn-deny  { background: #eee; color: #111; }
+    .btn-deny { background: #eee; color: #111; }
 
     .hidden { display:none !important; }
 
-    /* Widget container */
     .widget-container {
       position: fixed;
       bottom: calc(var(--safe-bottom) + 10px);
@@ -87,10 +84,8 @@
   </style>
 </head>
 <body>
-  <!-- Portrait background -->
   <div class="bg" id="bg"></div>
 
-  <!-- Permission Gate -->
   <div class="gate" id="gate" role="dialog" aria-modal="true" aria-labelledby="gateTitle">
     <div class="card">
       <h1 id="gateTitle">Enable voice for your tour?</h1>
@@ -102,15 +97,11 @@
     </div>
   </div>
 
-  <!-- ElevenLabs widget mounts here -->
   <div class="widget-container hidden" id="widgetContainer"></div>
-
-  <!-- Background Music (optional) -->
   <audio id="bgMusic" src="Background Music.mp3" loop></audio>
 
   <script>
     const AGENT_ID = "agent_4401k3npmamcf5hawj56bagnz96v";
-
     const bg = document.getElementById("bg");
     const gate = document.getElementById("gate");
     const allowBtn = document.getElementById("allowBtn");
@@ -118,101 +109,94 @@
     const widgetContainer = document.getElementById("widgetContainer");
     const bgMusic = document.getElementById("bgMusic");
 
-    // ----------------- IMAGE & ANIMATION CONFIG -----------------
-    // Your actual filenames:
-    const IMG = {
-      LISTEN_1: "bg_listen_1.png",
-      LISTEN_2: "bg_listen_2.png",
-      LISTEN_3: "bg_listen_3.png",
-      LISTEN_4: "bg_listen_4.png",
-      TALK_FRAMES: ["bg_talk_1.png", "bg_talk_2.png", "bg_talk_3.png"]
-    };
+    // -------- IMAGE SETUP --------
+    const LISTEN_FRAMES = [
+      "bg_listen_1.png",
+      "bg_listen_2.png",
+      "bg_listen_3.png",
+      "bg_listen_4.png"
+    ];
+    const TALK_FRAMES = [
+      "bg_talk_1.png",
+      "bg_talk_2.png",
+      "bg_talk_3.png"
+    ];
 
-    // Natural pacing (tuned slower)
     const SPEED = {
-      LISTEN_STEP_MS: 650,  // 3 -> 4 -> 3 cadence
-      LISTEN_PAUSE_MS: 450, // brief pause after a nod finishes
-      TALK_STEP_MS: 520,    // gentle swap while speaking
-      TALK_IDLE_NOD_EVERY_MS: 5500 // optional idle nod while listening
+      LISTEN_IDLE_MS: 2000,   // idle frame change pace
+      LISTEN_NOD_MS: 600,     // nod step speed
+      TALK_STEP_MS: 500       // talking frame pace
     };
 
+    let listenInterval = null;
+    let nodTimeout = null;
     let talkInterval = null;
-    let listenTimer = null;
-    let idleNodTimer = null;
+    let isTalking = false;
 
-    function setBackground(src) {
-      bg.style.backgroundImage = `url('${src}')`;
+    function setBackground(img) {
+      bg.style.backgroundImage = `url('${img}')`;
     }
 
-    // ----------------- LISTENING NOD -----------------
-    // Exact sequence: bg_listen_3 -> bg_listen_4 -> bg_listen_3
-    function playListeningNod(repeatCount = 1, onDone) {
-      stopListeningNod();
-      let repsLeft = Math.max(1, repeatCount);
-
-      function oneNod(cb) {
-        setBackground(IMG.LISTEN_3);
-        listenTimer = setTimeout(() => {
-          setBackground(IMG.LISTEN_4);
-          listenTimer = setTimeout(() => {
-            setBackground(IMG.LISTEN_3);
-            // tiny pause so it doesn't snap into another action
-            listenTimer = setTimeout(() => cb && cb(), SPEED.LISTEN_PAUSE_MS);
-          }, SPEED.LISTEN_STEP_MS);
-        }, SPEED.LISTEN_STEP_MS);
-      }
-
-      (function loop() {
-        if (repsLeft-- > 0) {
-          oneNod(loop);
-        } else {
-          listenTimer = null;
-          onDone && onDone();
-        }
-      })();
-    }
-
-    function stopListeningNod() {
-      if (listenTimer) {
-        clearTimeout(listenTimer);
-        listenTimer = null;
-      }
-    }
-
-    // Small idle nod occasionally when in listening state
-    function startIdleNods() {
-      stopIdleNods();
-      idleNodTimer = setInterval(() => playListeningNod(1), SPEED.TALK_IDLE_NOD_EVERY_MS);
-    }
-    function stopIdleNods() {
-      if (idleNodTimer) {
-        clearInterval(idleNodTimer);
-        idleNodTimer = null;
-      }
-    }
-
-    // ----------------- TALKING CYCLE -----------------
-    function startTalkingCycle() {
-      stopTalkingCycle();
-      stopListeningNod();
-      stopIdleNods();
-
+    // -------- LISTENING ANIMATION --------
+    function startListening() {
+      stopTalking();
+      stopListening();
       let i = 0;
-      setBackground(IMG.TALK_FRAMES[0]);
+      setBackground(LISTEN_FRAMES[0]);
+      listenInterval = setInterval(() => {
+        if (Math.random() < 0.25) {
+          // occasionally nod instead of normal frame advance
+          playNod();
+        } else {
+          i = (i + 1) % LISTEN_FRAMES.length;
+          setBackground(LISTEN_FRAMES[i]);
+        }
+      }, SPEED.LISTEN_IDLE_MS);
+    }
+
+    function stopListening() {
+      if (listenInterval) {
+        clearInterval(listenInterval);
+        listenInterval = null;
+      }
+      if (nodTimeout) {
+        clearTimeout(nodTimeout);
+        nodTimeout = null;
+      }
+    }
+
+    function playNod() {
+      stopListening();
+      setBackground("bg_listen_3.png");
+      nodTimeout = setTimeout(() => {
+        setBackground("bg_listen_4.png");
+        nodTimeout = setTimeout(() => {
+          setBackground("bg_listen_3.png");
+          startListening(); // resume idle listening afterwards
+        }, SPEED.LISTEN_NOD_MS);
+      }, SPEED.LISTEN_NOD_MS);
+    }
+
+    // -------- TALKING ANIMATION --------
+    function startTalking() {
+      stopListening();
+      stopTalking();
+      let i = 0;
+      setBackground(TALK_FRAMES[0]);
       talkInterval = setInterval(() => {
-        i = (i + 1) % IMG.TALK_FRAMES.length;
-        setBackground(IMG.TALK_FRAMES[i]);
+        i = (i + 1) % TALK_FRAMES.length;
+        setBackground(TALK_FRAMES[i]);
       }, SPEED.TALK_STEP_MS);
     }
 
-    function stopTalkingCycle() {
+    function stopTalking() {
       if (talkInterval) {
         clearInterval(talkInterval);
         talkInterval = null;
       }
     }
 
-    // ----------------- ELEVENLABS WIDGET -----------------
+    // -------- ELEVENLABS WIDGET --------
     function injectWidget() {
       if (!document.querySelector('script[src*="elevenlabs.io/convai-widget/index.js"]')) {
         const script = document.createElement("script");
@@ -221,33 +205,33 @@
         script.setAttribute("data-elevenlabs-convai", "true");
         document.body.appendChild(script);
       }
-
       widgetContainer.innerHTML =
         `<elevenlabs-convai agent-id="${AGENT_ID}" style="--voice-volume:1;"></elevenlabs-convai>`;
       widgetContainer.classList.remove("hidden");
 
       const convaiEl = widgetContainer.querySelector("elevenlabs-convai");
-      bindElevenLabsEvents(convaiEl);
+      bindEvents(convaiEl);
     }
 
-    function bindElevenLabsEvents(convaiEl) {
+    function bindEvents(convaiEl) {
       const onTtsStart = () => {
-        startTalkingCycle();
+        isTalking = true;
+        startTalking();
       };
       const onTtsStop = () => {
-        stopTalkingCycle();
-        setBackground(IMG.LISTEN_3);
-        playListeningNod(1, startIdleNods);
+        isTalking = false;
+        stopTalking();
+        startListening();
       };
 
-      // Try common custom events
-      ["playback-start","speech-start","audio-start","conversation-start","agent-speaks-start"]
-        .forEach(evt => convaiEl.addEventListener(evt, onTtsStart));
+      ["playback-start","speech-start","audio-start"].forEach(e =>
+        convaiEl.addEventListener(e, onTtsStart)
+      );
+      ["playback-complete","speech-end","audio-end","playback-error"].forEach(e =>
+        convaiEl.addEventListener(e, onTtsStop)
+      );
 
-      ["playback-complete","playback-end","speech-end","audio-end","conversation-end","agent-speaks-end","playback-error"]
-        .forEach(evt => convaiEl.addEventListener(evt, onTtsStop));
-
-      // Fallback: observe a shadow audio element
+      // fallback audio detection
       const tryBindAudio = () => {
         try {
           const root = convaiEl.shadowRoot;
@@ -260,51 +244,36 @@
           return true;
         } catch { return false; }
       };
-
-      // Attempt to find audio a few times (widget may attach later)
       let attempts = 0;
       const poll = setInterval(() => {
         if (tryBindAudio() || attempts++ > 40) clearInterval(poll);
       }, 250);
 
-      // Enter listening state initially
-      setBackground(IMG.LISTEN_3);
-      startIdleNods();
+      startListening(); // initial state
     }
 
-    // ----------------- EXPERIENCE FLOW -----------------
+    // -------- EXPERIENCE FLOW --------
     async function startExperience() {
       try {
         await navigator.mediaDevices.getUserMedia({ audio: true });
       } catch {
-        alert("Microphone permission denied. Please enable it to use the voice tour.");
+        alert("Microphone permission denied.");
         return;
       }
-
-      // Show conversation background/state
       bg.classList.add("conversation");
-      setBackground(IMG.LISTEN_3);
-
-      // Hide gate
       gate.classList.add("hidden");
-
-      // Background music (optional)
       bgMusic.volume = 0.15;
-      bgMusic.play().catch(() => {});
-
-      // Mount widget
+      bgMusic.play().catch(()=>{});
       injectWidget();
-
-      // A gentle initial nod
-      playListeningNod(1);
     }
 
     allowBtn.addEventListener("click", startExperience);
     denyBtn.addEventListener("click", () => gate.classList.add("hidden"));
 
-    // viewport height fix
-    const setVH = () => document.documentElement.style.setProperty("--vh", `${window.innerHeight * 0.01}px`);
-    setVH(); window.addEventListener("resize", setVH);
+    const setVH = () =>
+      document.documentElement.style.setProperty("--vh", `${window.innerHeight * 0.01}px`);
+    setVH();
+    window.addEventListener("resize", setVH);
   </script>
 </body>
 </html>
