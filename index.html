@@ -2,91 +2,60 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta
-    name="viewport"
-    content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no"
-  />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no" />
   <title>Henric Piccardt Tour</title>
   <meta name="theme-color" content="#1d1d1b" />
   <style>
-    :root {
-      --vh: 1vh;
-      --safe-bottom: env(safe-area-inset-bottom, 0px);
-    }
+    :root { --vh: 1vh; --safe-bottom: env(safe-area-inset-bottom, 0px); }
     html, body {
       height: calc(var(--vh) * 100);
-      margin: 0;
-      padding: 0;
-      overflow: hidden;
+      margin: 0; padding: 0; overflow: hidden;
       font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-      background: #000; /* fallback to black */
+      background:#000; /* safe fallback */
     }
 
+    /* Crossfade stack (A/B layers) */
     .bg-layer {
-      position: fixed;
-      inset: 0;
+      position: fixed; inset: 0;
       background: center center / cover no-repeat;
       opacity: 0;
-      transition: opacity 0.6s ease; /* fade duration */
-      z-index: 0;
+      transition: opacity 480ms linear; /* linear = no “pulse” */
+      will-change: opacity;
+      backface-visibility: hidden;
     }
-    .bg-layer.visible {
-      opacity: 1;
-    }
+    .bg-layer.visible { opacity: 1; }
+    /* Ensure the incoming layer sits above the outgoing one during fades */
+    #bgA { z-index: 0; }
+    #bgB { z-index: 1; }
 
     .gate {
-      position: fixed;
-      inset: 0;
-      display: flex;
-      justify-content: center;
-      align-items: flex-end;
-      padding-bottom: 18%;
-      z-index: 20;
-      background: rgba(0,0,0,0.12);
+      position: fixed; inset: 0; display: flex; justify-content: center; align-items: flex-end;
+      padding-bottom: 18%; z-index: 20; background: rgba(0,0,0,.12);
     }
     .card {
-      width: min(90vw, 420px);
-      border-radius: 18px;
-      background: rgba(255,255,255,0.95);
-      box-shadow: 0 12px 40px rgba(0,0,0,.25);
-      padding: 18px;
-      text-align: center;
+      width: min(90vw, 420px); border-radius: 18px; background: rgba(255,255,255,.95);
+      box-shadow: 0 12px 40px rgba(0,0,0,.25); padding: 18px; text-align: center;
     }
     .card h1 { font-size: 1.1rem; margin: 6px 0 10px; }
     .card p { font-size: .95rem; margin: 0 0 12px; }
     .row { display: flex; gap: 10px; }
-    .btn {
-      flex: 1 1 auto;
-      padding: 12px 14px;
-      border-radius: 12px;
-      border: 2px solid transparent;
-      font-weight: 600;
-      cursor: pointer;
-    }
-    .btn-allow { background: #0b6efd; color: #fff; }
-    .btn-deny { background: #eee; color: #111; }
+    .btn { flex: 1 1 auto; padding: 12px 14px; border-radius: 12px; border: 2px solid transparent; font-weight: 600; cursor: pointer; }
+    .btn-allow { background:#0b6efd; color:#fff; }
+    .btn-deny { background:#eee; color:#111; }
 
     .hidden { display:none !important; }
 
     .widget-container {
-      position: fixed;
-      bottom: calc(var(--safe-bottom) + 10px);
-      left: 50%;
-      transform: translateX(-50%);
-      width: 92%;
-      max-width: 480px;
-      z-index: 10;
+      position: fixed; bottom: calc(var(--safe-bottom) + 10px); left: 50%; transform: translateX(-50%);
+      width: 92%; max-width: 480px; z-index: 10;
     }
     .widget-container > elevenlabs-convai,
-    .widget-container iframe {
-      width: 100%;
-      height: 140px;
-    }
+    .widget-container iframe { width: 100%; height: 140px; }
   </style>
 </head>
 <body>
-  <!-- Two background layers for crossfade -->
-  <div class="bg-layer visible" id="bgA" style="background-image: url('Background 1.png');"></div>
+  <!-- Two layers for seamless fades -->
+  <div class="bg-layer visible" id="bgA" style="background-image:url('Background 1.png')"></div>
   <div class="bg-layer" id="bgB"></div>
 
   <div class="gate" id="gate" role="dialog" aria-modal="true" aria-labelledby="gateTitle">
@@ -106,6 +75,7 @@
 
   <script>
     const AGENT_ID = "agent_4401k3npmamcf5hawj56bagnz96v";
+
     const gate = document.getElementById("gate");
     const allowBtn = document.getElementById("allowBtn");
     const denyBtn = document.getElementById("denyBtn");
@@ -114,7 +84,9 @@
 
     const bgA = document.getElementById("bgA");
     const bgB = document.getElementById("bgB");
-    let activeLayer = bgA;
+    let topLayer = bgB;      // top layer (above)
+    let bottomLayer = bgA;   // bottom layer (below)
+    let isFading = false;
 
     let cycleInterval = null;
 
@@ -122,21 +94,47 @@
     const listenImages = ["bg_listen_2.png", "bg_listen_3.png", "bg_listen_4.png"];
     const allImages = ["Background 1.png", "background_convo.png", ...talkImages, ...listenImages];
 
-    // Preload all images
-    function preloadImages(urls) {
-      urls.forEach(src => {
-        const img = new Image();
-        img.src = src;
-      });
-    }
-    preloadImages(allImages);
+    // Preload all images (prevents flash)
+    allImages.forEach(src => { const i = new Image(); i.decoding = "async"; i.src = src; });
 
+    // Fade-in-only algorithm (no brightness dip):
+    // 1) Put new image on the top layer at opacity 0.
+    // 2) Fade top layer to 1 (bottom stays at 1).
+    // 3) After transition ends, snap bottom to 0 with transition disabled, swap refs.
     function fadeBackground(newImg) {
-      const nextLayer = activeLayer === bgA ? bgB : bgA;
-      nextLayer.style.backgroundImage = `url('${newImg}')`;
-      nextLayer.classList.add("visible");
-      activeLayer.classList.remove("visible");
-      activeLayer = nextLayer;
+      if (isFading) return; // avoid overlapping fades
+      isFading = true;
+
+      // prepare top layer with new image at 0
+      topLayer.style.transition = "opacity 0ms linear";
+      topLayer.style.opacity = "0";
+      topLayer.style.backgroundImage = `url('${newImg}')`;
+
+      // force reflow so the next opacity change transitions
+      void topLayer.offsetHeight;
+
+      // fade top to 1 linearly
+      topLayer.style.transition = "opacity 480ms linear";
+      topLayer.classList.add("visible");   // opacity:1
+      topLayer.style.opacity = "1";
+
+      const onDone = () => {
+        topLayer.removeEventListener("transitionend", onDone);
+
+        // hide the bottom instantly (no visual change because top fully covers it)
+        bottomLayer.style.transition = "opacity 0ms linear";
+        bottomLayer.classList.remove("visible"); // opacity:0
+
+        // swap roles
+        [topLayer, bottomLayer] = [bottomLayer, topLayer];
+
+        // ensure bottom is reset for the next cycle
+        bottomLayer.style.transition = "opacity 0ms linear";
+        bottomLayer.style.opacity = "0";
+
+        isFading = false;
+      };
+      topLayer.addEventListener("transitionend", onDone, { once: true });
     }
 
     function startCycle(images) {
@@ -144,7 +142,7 @@
       fadeBackground(images[Math.floor(Math.random() * images.length)]);
       cycleInterval = setInterval(() => {
         fadeBackground(images[Math.floor(Math.random() * images.length)]);
-      }, 1500);
+      }, 1600); // interval slightly longer than fade duration
     }
 
     function stopCycle() {
@@ -158,6 +156,7 @@
       setTimeout(() => {
         const root = widgetEl.shadowRoot;
         if (!root) return;
+
         const observer = new MutationObserver(() => {
           const txt = root.textContent.toLowerCase();
 
@@ -199,10 +198,8 @@
       }
 
       gate.classList.add("hidden");
-
       bgMusic.volume = 0.15;
-      bgMusic.play().catch(err => console.log("Autoplay blocked:", err));
-
+      bgMusic.play().catch(()=>{});
       injectWidget();
     }
 
@@ -210,8 +207,7 @@
     denyBtn.addEventListener("click", () => gate.classList.add("hidden"));
 
     const setVH = () => document.documentElement.style.setProperty("--vh", `${window.innerHeight * 0.01}px`);
-    setVH();
-    window.addEventListener("resize", setVH);
+    setVH(); window.addEventListener("resize", setVH);
   </script>
 </body>
 </html>
