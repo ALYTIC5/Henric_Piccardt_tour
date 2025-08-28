@@ -19,18 +19,22 @@
       padding: 0;
       overflow: hidden;
       font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      background: #161513;
+      color: #111;
     }
 
+    /* Background portrait image */
     .bg {
       position: fixed;
       inset: 0;
       background: url("Background 1.png") center center / cover no-repeat;
-      transition: background-image .5s ease;
+      transition: background-image .45s ease; /* soft fade between frames */
     }
     .bg.conversation {
-      background-image: url("background_convo.png");
+      background-image: url("bg_listen_3.png"); /* start in neutral listening pose */
     }
 
+    /* Permission Gate */
     .gate {
       position: fixed;
       inset: 0;
@@ -44,13 +48,13 @@
     .card {
       width: min(90vw, 420px);
       border-radius: 18px;
-      background: rgba(255,255,255,0.95);
+      background: rgba(255,255,255,0.96);
       box-shadow: 0 12px 40px rgba(0,0,0,.25);
       padding: 18px;
       text-align: center;
     }
     .card h1 { font-size: 1.1rem; margin: 6px 0 10px; }
-    .card p { font-size: .95rem; margin: 0 0 12px; }
+    .card p { font-size: .95rem; margin: 0 0 12px; color: #333; }
     .row { display: flex; gap: 10px; }
     .btn {
       flex: 1 1 auto;
@@ -61,10 +65,11 @@
       cursor: pointer;
     }
     .btn-allow { background: #0b6efd; color: #fff; }
-    .btn-deny { background: #eee; color: #111; }
+    .btn-deny  { background: #eee; color: #111; }
 
     .hidden { display:none !important; }
 
+    /* Widget container */
     .widget-container {
       position: fixed;
       bottom: calc(var(--safe-bottom) + 10px);
@@ -82,8 +87,10 @@
   </style>
 </head>
 <body>
+  <!-- Portrait background -->
   <div class="bg" id="bg"></div>
 
+  <!-- Permission Gate -->
   <div class="gate" id="gate" role="dialog" aria-modal="true" aria-labelledby="gateTitle">
     <div class="card">
       <h1 id="gateTitle">Enable voice for your tour?</h1>
@@ -95,48 +102,50 @@
     </div>
   </div>
 
+  <!-- ElevenLabs widget mounts here -->
   <div class="widget-container hidden" id="widgetContainer"></div>
 
+  <!-- Background Music (optional) -->
   <audio id="bgMusic" src="Background Music.mp3" loop></audio>
 
   <script>
     const AGENT_ID = "agent_4401k3npmamcf5hawj56bagnz96v";
+
     const bg = document.getElementById("bg");
     const gate = document.getElementById("gate");
     const allowBtn = document.getElementById("allowBtn");
-    const denyBtn = document.getElementById("denyBtn");
+    const denyBtn  = document.getElementById("denyBtn");
     const widgetContainer = document.getElementById("widgetContainer");
     const bgMusic = document.getElementById("bgMusic");
 
-    // ---------- IMAGE & ANIMATION CONFIG ----------
+    // ----------------- IMAGE & ANIMATION CONFIG -----------------
+    // Your actual filenames:
     const IMG = {
-      LISTEN_3: "bg_listening_3.png",
-      LISTEN_4: "bg_listening_4.png",
-      // add as many talk frames as you have
-      TALK_FRAMES: [
-        "bg_talk_1.png",
-        "bg_talk_2.png",
-        "bg_talk_3.png",
-        "bg_talk_4.png",
-        "bg_talk_5.png",
-        "bg_talk_6.png"
-      ]
-    };
-    const SPEED = {
-      LISTEN_STEP_MS: 180,  // 3 -> 4 -> 3 cadence
-      TALK_STEP_MS: 110     // frame swap while speaking
+      LISTEN_1: "bg_listen_1.png",
+      LISTEN_2: "bg_listen_2.png",
+      LISTEN_3: "bg_listen_3.png",
+      LISTEN_4: "bg_listen_4.png",
+      TALK_FRAMES: ["bg_talk_1.png", "bg_talk_2.png", "bg_talk_3.png"]
     };
 
-    // simple state
+    // Natural pacing (tuned slower)
+    const SPEED = {
+      LISTEN_STEP_MS: 650,  // 3 -> 4 -> 3 cadence
+      LISTEN_PAUSE_MS: 450, // brief pause after a nod finishes
+      TALK_STEP_MS: 520,    // gentle swap while speaking
+      TALK_IDLE_NOD_EVERY_MS: 5500 // optional idle nod while listening
+    };
+
     let talkInterval = null;
     let listenTimer = null;
+    let idleNodTimer = null;
 
-    // Use your existing background-switching logic
-    function setBackground(img) {
-      bg.style.backgroundImage = `url('${img}')`;
+    function setBackground(src) {
+      bg.style.backgroundImage = `url('${src}')`;
     }
 
-    // ----- LISTENING NOD: bg_listening_3 -> bg_listening_4 -> bg_listening_3 -----
+    // ----------------- LISTENING NOD -----------------
+    // Exact sequence: bg_listen_3 -> bg_listen_4 -> bg_listen_3
     function playListeningNod(repeatCount = 1, onDone) {
       stopListeningNod();
       let repsLeft = Math.max(1, repeatCount);
@@ -147,7 +156,8 @@
           setBackground(IMG.LISTEN_4);
           listenTimer = setTimeout(() => {
             setBackground(IMG.LISTEN_3);
-            cb && cb();
+            // tiny pause so it doesn't snap into another action
+            listenTimer = setTimeout(() => cb && cb(), SPEED.LISTEN_PAUSE_MS);
           }, SPEED.LISTEN_STEP_MS);
         }, SPEED.LISTEN_STEP_MS);
       }
@@ -169,13 +179,24 @@
       }
     }
 
-    // ----- TALKING ANIMATION: cycle any bg_talk_* frames while speaking -----
+    // Small idle nod occasionally when in listening state
+    function startIdleNods() {
+      stopIdleNods();
+      idleNodTimer = setInterval(() => playListeningNod(1), SPEED.TALK_IDLE_NOD_EVERY_MS);
+    }
+    function stopIdleNods() {
+      if (idleNodTimer) {
+        clearInterval(idleNodTimer);
+        idleNodTimer = null;
+      }
+    }
+
+    // ----------------- TALKING CYCLE -----------------
     function startTalkingCycle() {
       stopTalkingCycle();
-      // ensure we’re not mid-nod
       stopListeningNod();
+      stopIdleNods();
 
-      if (!IMG.TALK_FRAMES.length) return;
       let i = 0;
       setBackground(IMG.TALK_FRAMES[0]);
       talkInterval = setInterval(() => {
@@ -191,51 +212,7 @@
       }
     }
 
-    // ---------- FALLBACK WIDGET WATCHER ----------
-    // Watches the widget’s shadow DOM text to infer states.
-    function attachFallbackWatcher(widgetEl) {
-      setTimeout(() => {
-        const root = widgetEl.shadowRoot;
-        if (!root) return;
-
-        const observer = new MutationObserver(() => {
-          const txt = (root.textContent || "").toLowerCase();
-
-          // Heuristics: tweak these if your widget text changes
-          const isSpeaking =
-            txt.includes("talk to interrupt") ||
-            txt.includes("speaking") ||
-            txt.includes("playing") ||
-            txt.includes("agent is talking");
-
-          const isListening =
-            txt.includes("listening") ||
-            txt.includes("say something") ||
-            txt.includes("awaiting") ||
-            txt.includes("your turn");
-
-          if (isSpeaking) {
-            startTalkingCycle();
-          } else if (isListening) {
-            stopTalkingCycle();
-            // exact nod sequence you requested: 3 -> 4 -> 3
-            playListeningNod(1);
-          } else {
-            // neutral background for unknown state
-            stopTalkingCycle();
-            stopListeningNod();
-            setBackground("background_convo.png");
-          }
-        });
-
-        observer.observe(root, { subtree: true, characterData: true, childList: true });
-
-        // Kick it once at attach time to enter a sane default
-        setBackground(IMG.LISTEN_3);
-      }, 300);
-    }
-
-    // ---------- ELEVENLABS WIDGET ----------
+    // ----------------- ELEVENLABS WIDGET -----------------
     function injectWidget() {
       if (!document.querySelector('script[src*="elevenlabs.io/convai-widget/index.js"]')) {
         const script = document.createElement("script");
@@ -249,11 +226,53 @@
         `<elevenlabs-convai agent-id="${AGENT_ID}" style="--voice-volume:1;"></elevenlabs-convai>`;
       widgetContainer.classList.remove("hidden");
 
-      const widget = widgetContainer.querySelector("elevenlabs-convai");
-      attachFallbackWatcher(widget);
+      const convaiEl = widgetContainer.querySelector("elevenlabs-convai");
+      bindElevenLabsEvents(convaiEl);
     }
 
-    // ---------- EXPERIENCE FLOW ----------
+    function bindElevenLabsEvents(convaiEl) {
+      const onTtsStart = () => {
+        startTalkingCycle();
+      };
+      const onTtsStop = () => {
+        stopTalkingCycle();
+        setBackground(IMG.LISTEN_3);
+        playListeningNod(1, startIdleNods);
+      };
+
+      // Try common custom events
+      ["playback-start","speech-start","audio-start","conversation-start","agent-speaks-start"]
+        .forEach(evt => convaiEl.addEventListener(evt, onTtsStart));
+
+      ["playback-complete","playback-end","speech-end","audio-end","conversation-end","agent-speaks-end","playback-error"]
+        .forEach(evt => convaiEl.addEventListener(evt, onTtsStop));
+
+      // Fallback: observe a shadow audio element
+      const tryBindAudio = () => {
+        try {
+          const root = convaiEl.shadowRoot;
+          if (!root) return false;
+          const audio = root.querySelector("audio");
+          if (!audio) return false;
+          audio.addEventListener("play", onTtsStart);
+          audio.addEventListener("pause", onTtsStop);
+          audio.addEventListener("ended", onTtsStop);
+          return true;
+        } catch { return false; }
+      };
+
+      // Attempt to find audio a few times (widget may attach later)
+      let attempts = 0;
+      const poll = setInterval(() => {
+        if (tryBindAudio() || attempts++ > 40) clearInterval(poll);
+      }, 250);
+
+      // Enter listening state initially
+      setBackground(IMG.LISTEN_3);
+      startIdleNods();
+    }
+
+    // ----------------- EXPERIENCE FLOW -----------------
     async function startExperience() {
       try {
         await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -262,21 +281,21 @@
         return;
       }
 
-      // show conversation background
+      // Show conversation background/state
       bg.classList.add("conversation");
-      setBackground(IMG.LISTEN_3); // start in listening pose
+      setBackground(IMG.LISTEN_3);
 
-      // hide gate
+      // Hide gate
       gate.classList.add("hidden");
 
-      // music
+      // Background music (optional)
       bgMusic.volume = 0.15;
-      bgMusic.play().catch(err => console.log("Autoplay blocked:", err));
+      bgMusic.play().catch(() => {});
 
-      // mount widget + bindings
+      // Mount widget
       injectWidget();
 
-      // subtle initial nod so the character feels alive
+      // A gentle initial nod
       playListeningNod(1);
     }
 
@@ -285,8 +304,7 @@
 
     // viewport height fix
     const setVH = () => document.documentElement.style.setProperty("--vh", `${window.innerHeight * 0.01}px`);
-    setVH();
-    window.addEventListener("resize", setVH);
+    setVH(); window.addEventListener("resize", setVH);
   </script>
 </body>
 </html>
