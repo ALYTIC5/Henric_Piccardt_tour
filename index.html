@@ -32,6 +32,21 @@
       background-image: url("background_convo.png");
     }
 
+    /* Character avatar (overlayed on background) */
+    .avatar {
+      position: fixed;
+      bottom: calc(var(--safe-bottom) + 150px);
+      left: 50%;
+      transform: translateX(-50%);
+      width: min(70vw, 520px);
+      max-height: 75vh;
+      object-fit: contain;
+      z-index: 5;
+      pointer-events: none;
+      user-select: none;
+      image-rendering: auto;
+    }
+
     /* Permission Gate */
     .gate {
       position: fixed;
@@ -87,6 +102,10 @@
 <body>
   <div class="bg" id="bg"></div>
 
+  <!-- Character image (listening/talking frames) -->
+  <!-- Default to listening_3 so we have the neutral "listening" pose at load -->
+  <img id="avatar" class="avatar" src="bg_listening_3.png" alt="Character" />
+
   <!-- Permission Gate -->
   <div class="gate" id="gate" role="dialog" aria-modal="true" aria-labelledby="gateTitle">
     <div class="card">
@@ -114,7 +133,89 @@
     const denyBtn = document.getElementById("denyBtn");
     const widgetContainer = document.getElementById("widgetContainer");
     const bgMusic = document.getElementById("bgMusic");
+    const avatar = document.getElementById("avatar");
 
+    // ====== IMAGE SETUP ======
+    const IMG = {
+      LISTEN_3: "bg_listening_3.png",
+      LISTEN_4: "bg_listening_4.png",
+      // Add/remove any talk frames you have available:
+      TALK_FRAMES: [
+        "bg_talk_1.png",
+        "bg_talk_2.png",
+        "bg_talk_3.png",
+        "bg_talk_4.png"
+      ]
+    };
+    const SPEED = {
+      LISTEN_STEP_MS: 180, // timing for nod steps
+      TALK_STEP_MS: 110    // frame swap while speaking
+    };
+
+    let talkTimer = null;
+    let listenTimer = null;
+    let isSpeaking = false;
+
+    function setImage(src) {
+      if (!avatar) return;
+      // prevent redundant swaps
+      // (use URL endsWith so it works whether src is absolute or relative)
+      if (avatar.src.endsWith(src)) return;
+      avatar.src = src;
+    }
+
+    // Listening nod: 3 -> 4 -> 3 (one repetition)
+    function playListeningNod(repeatCount = 1, onDone) {
+      stopListening();
+      let repsLeft = Math.max(1, repeatCount);
+
+      function oneNod(cb) {
+        setImage(IMG.LISTEN_3);
+        listenTimer = setTimeout(() => {
+          setImage(IMG.LISTEN_4);
+          listenTimer = setTimeout(() => {
+            setImage(IMG.LISTEN_3);
+            cb && cb();
+          }, SPEED.LISTEN_STEP_MS);
+        }, SPEED.LISTEN_STEP_MS);
+      }
+
+      (function loop() {
+        if (repsLeft-- > 0) {
+          oneNod(loop);
+        } else {
+          listenTimer = null;
+          onDone && onDone();
+        }
+      })();
+    }
+
+    function stopListening() {
+      if (listenTimer) {
+        clearTimeout(listenTimer);
+        listenTimer = null;
+      }
+    }
+
+    // Talking: cycle through any bg_talk frames while speaking
+    function startTalkingAnimation() {
+      if (talkTimer) return;
+      let i = 0;
+      talkTimer = setInterval(() => {
+        const frame = IMG.TALK_FRAMES[i % IMG.TALK_FRAMES.length];
+        setImage(frame);
+        i++;
+      }, SPEED.TALK_STEP_MS);
+    }
+
+    function stopTalkingAnimation() {
+      if (talkTimer) {
+        clearInterval(talkTimer);
+        talkTimer = null;
+      }
+    }
+
+    // ====== ELEVENLABS WIDGET INTEGRATION ======
     function injectWidget() {
       if (!document.querySelector('script[src*="elevenlabs.io/convai-widget/index.js"]')) {
         const script = document.createElement("script");
@@ -125,6 +226,79 @@
       }
       widgetContainer.innerHTML = `<elevenlabs-convai agent-id="${AGENT_ID}" style="--voice-volume:1;"></elevenlabs-convai>`;
       widgetContainer.classList.remove("hidden");
+
+      // When the custom element upgrades, bind events
+      waitForConvaiReady().then(bindElevenLabsEvents).catch(() => {
+        // even if it never upgrades, we can still run without bindings
+      });
+    }
+
+    // Wait for the <elevenlabs-convai> element to be defined and upgraded
+    function waitForConvaiReady() {
+      return new Promise((resolve, reject) => {
+        const el = widgetContainer.querySelector("elevenlabs-convai");
+        if (!el) return reject();
+
+        if (customElements.get("elevenlabs-convai")) return resolve(el);
+
+        const t = setTimeout(() => reject(new Error("timeout")), 5000);
+        customElements.whenDefined("elevenlabs-convai").then(() => {
+          clearTimeout(t);
+          resolve(el);
+        });
+      });
+    }
+
+    // Try several likely event names; also add a fallback observer
+    function bindElevenLabsEvents(convaiEl) {
+      const onTtsStart = () => {
+        isSpeaking = true;
+        stopListening();        // stop any nodding
+        startTalkingAnimation();// show bg_talk_* frames
+      };
+      const onTtsStop = () => {
+        isSpeaking = false;
+        stopTalkingAnimation(); // stop talk frames
+        // After speaking, perform one nod (3 -> 4 -> 3)
+        playListeningNod(1);
+      };
+
+      // Common/likely custom events (names may vary by widget version)
+      const startEvents = [
+        "playback-start", "speech-start", "audio-start",
+        "conversation-start", "agent-speaks-start"
+      ];
+      const stopEvents = [
+        "playback-complete", "playback-end", "speech-end", "audio-end",
+        "conversation-end", "agent-speaks-end", "playback-error"
+      ];
+
+      startEvents.forEach(evt => convaiEl.addEventListener(evt, onTtsStart));
+      stopEvents.forEach(evt  => convaiEl.addEventListener(evt, onTtsStop));
+
+      // Fallback: observe shadow DOM for an <audio> element state
+      // If found, hook to its play/pause events to infer speaking.
+      const tryBindAudio = () => {
+        try {
+          const root = convaiEl.shadowRoot;
+          if (!root) return false;
+          const audio = root.querySelector("audio");
+          if (!audio) return false;
+
+          audio.addEventListener("play", onTtsStart);
+          audio.addEventListener("pause", onTtsStop);
+          audio.addEventListener("ended", onTtsStop);
+          return true;
+        } catch {
+          return false;
+        }
+      };
+
+      // Attempt immediately, and again a few times (widget may attach audio later)
+      let attempts = 0;
+      const poll = setInterval(() => {
+        if (tryBindAudio() || attempts++ > 40) clearInterval(poll);
+      }, 250);
     }
 
     async function startExperience() {
@@ -148,6 +322,10 @@
 
       // load & mount ElevenLabs widget
       injectWidget();
+
+      // settle into a listening pose and give a small nod right away
+      setImage(IMG.LISTEN_3);
+      playListeningNod(1);
     }
 
     allowBtn.addEventListener("click", startExperience);
@@ -158,6 +336,19 @@
     // viewport height fix
     const setVH = () => document.documentElement.style.setProperty("--vh", `${window.innerHeight * 0.01}px`);
     setVH(); window.addEventListener("resize", setVH);
+
+    // Optional: Expose manual controls for debugging
+    window.AVATAR_ANIM = {
+      talkStart: () => {
+        stopListening();
+        startTalkingAnimation();
+      },
+      talkStop: () => {
+        stopTalkingAnimation();
+        playListeningNod(1);
+      },
+      listenNod: (repeat = 1) => playListeningNod(repeat)
+    };
   </script>
 </body>
 </html>
