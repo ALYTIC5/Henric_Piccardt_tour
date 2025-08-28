@@ -108,21 +108,80 @@
     const widgetContainer = document.getElementById("widgetContainer");
     const bgMusic = document.getElementById("bgMusic");
 
-    let talkInterval = null;
-    let talkToggle = false;
+    // ---------- IMAGE & ANIMATION CONFIG ----------
+    const IMG = {
+      LISTEN_3: "bg_listening_3.png",
+      LISTEN_4: "bg_listening_4.png",
+      // add as many talk frames as you have
+      TALK_FRAMES: [
+        "bg_talk_1.png",
+        "bg_talk_2.png",
+        "bg_talk_3.png",
+        "bg_talk_4.png",
+        "bg_talk_5.png",
+        "bg_talk_6.png"
+      ]
+    };
+    const SPEED = {
+      LISTEN_STEP_MS: 180,  // 3 -> 4 -> 3 cadence
+      TALK_STEP_MS: 110     // frame swap while speaking
+    };
 
+    // simple state
+    let talkInterval = null;
+    let listenTimer = null;
+
+    // Use your existing background-switching logic
     function setBackground(img) {
       bg.style.backgroundImage = `url('${img}')`;
     }
 
+    // ----- LISTENING NOD: bg_listening_3 -> bg_listening_4 -> bg_listening_3 -----
+    function playListeningNod(repeatCount = 1, onDone) {
+      stopListeningNod();
+      let repsLeft = Math.max(1, repeatCount);
+
+      function oneNod(cb) {
+        setBackground(IMG.LISTEN_3);
+        listenTimer = setTimeout(() => {
+          setBackground(IMG.LISTEN_4);
+          listenTimer = setTimeout(() => {
+            setBackground(IMG.LISTEN_3);
+            cb && cb();
+          }, SPEED.LISTEN_STEP_MS);
+        }, SPEED.LISTEN_STEP_MS);
+      }
+
+      (function loop() {
+        if (repsLeft-- > 0) {
+          oneNod(loop);
+        } else {
+          listenTimer = null;
+          onDone && onDone();
+        }
+      })();
+    }
+
+    function stopListeningNod() {
+      if (listenTimer) {
+        clearTimeout(listenTimer);
+        listenTimer = null;
+      }
+    }
+
+    // ----- TALKING ANIMATION: cycle any bg_talk_* frames while speaking -----
     function startTalkingCycle() {
       stopTalkingCycle();
-      talkToggle = false;
-      setBackground("bg_talk_1.png");
+      // ensure we’re not mid-nod
+      stopListeningNod();
+
+      if (!IMG.TALK_FRAMES.length) return;
+      let i = 0;
+      setBackground(IMG.TALK_FRAMES[0]);
       talkInterval = setInterval(() => {
-        talkToggle = !talkToggle;
-        setBackground(talkToggle ? "bg_talk_2.png" : "bg_talk_1.png");
-      }, 3000);
+        i = (i + 1) % IMG.TALK_FRAMES.length;
+        setBackground(IMG.TALK_FRAMES[i]);
+      }, SPEED.TALK_STEP_MS);
     }
 
     function stopTalkingCycle() {
@@ -132,28 +191,51 @@
       }
     }
 
+    // ---------- FALLBACK WIDGET WATCHER ----------
+    // Watches the widget’s shadow DOM text to infer states.
     function attachFallbackWatcher(widgetEl) {
       setTimeout(() => {
         const root = widgetEl.shadowRoot;
         if (!root) return;
-        const observer = new MutationObserver(() => {
-          const txt = root.textContent.toLowerCase();
-          // console.log("Widget status text:", txt);
 
-          if (txt.includes("listening")) {
-            stopTalkingCycle();
-            setBackground("bg_listen_3.png");
-          } else if (txt.includes("talk to interrupt")) {
+        const observer = new MutationObserver(() => {
+          const txt = (root.textContent || "").toLowerCase();
+
+          // Heuristics: tweak these if your widget text changes
+          const isSpeaking =
+            txt.includes("talk to interrupt") ||
+            txt.includes("speaking") ||
+            txt.includes("playing") ||
+            txt.includes("agent is talking");
+
+          const isListening =
+            txt.includes("listening") ||
+            txt.includes("say something") ||
+            txt.includes("awaiting") ||
+            txt.includes("your turn");
+
+          if (isSpeaking) {
             startTalkingCycle();
-          } else {
+          } else if (isListening) {
             stopTalkingCycle();
+            // exact nod sequence you requested: 3 -> 4 -> 3
+            playListeningNod(1);
+          } else {
+            // neutral background for unknown state
+            stopTalkingCycle();
+            stopListeningNod();
             setBackground("background_convo.png");
           }
         });
+
         observer.observe(root, { subtree: true, characterData: true, childList: true });
+
+        // Kick it once at attach time to enter a sane default
+        setBackground(IMG.LISTEN_3);
       }, 300);
     }
 
+    // ---------- ELEVENLABS WIDGET ----------
     function injectWidget() {
       if (!document.querySelector('script[src*="elevenlabs.io/convai-widget/index.js"]')) {
         const script = document.createElement("script");
@@ -163,13 +245,15 @@
         document.body.appendChild(script);
       }
 
-      widgetContainer.innerHTML = `<elevenlabs-convai agent-id="${AGENT_ID}" style="--voice-volume:1;"></elevenlabs-convai>`;
+      widgetContainer.innerHTML =
+        `<elevenlabs-convai agent-id="${AGENT_ID}" style="--voice-volume:1;"></elevenlabs-convai>`;
       widgetContainer.classList.remove("hidden");
 
       const widget = widgetContainer.querySelector("elevenlabs-convai");
       attachFallbackWatcher(widget);
     }
 
+    // ---------- EXPERIENCE FLOW ----------
     async function startExperience() {
       try {
         await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -178,20 +262,28 @@
         return;
       }
 
+      // show conversation background
       bg.classList.add("conversation");
-      setBackground("background_convo.png");
+      setBackground(IMG.LISTEN_3); // start in listening pose
 
+      // hide gate
       gate.classList.add("hidden");
 
+      // music
       bgMusic.volume = 0.15;
       bgMusic.play().catch(err => console.log("Autoplay blocked:", err));
 
+      // mount widget + bindings
       injectWidget();
+
+      // subtle initial nod so the character feels alive
+      playListeningNod(1);
     }
 
     allowBtn.addEventListener("click", startExperience);
     denyBtn.addEventListener("click", () => gate.classList.add("hidden"));
 
+    // viewport height fix
     const setVH = () => document.documentElement.style.setProperty("--vh", `${window.innerHeight * 0.01}px`);
     setVH();
     window.addEventListener("resize", setVH);
