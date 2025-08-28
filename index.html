@@ -37,12 +37,14 @@
       background: rgba(0,0,0,0.05); /* lowered so FRAEYLEMABORG remains clearly visible */
     }
     .card {
-      width: min(90vw, 420px);
-      border-radius: 18px;
-      background: rgba(255,255,255,0.95);
-      box-shadow: 0 12px 40px rgba(0,0,0,.25);
-      padding: 18px;
-      text-align: center;
+    width: min(90vw, 420px);
+    border-radius: 18px;
+    background: rgba(255,255,255,0.85); /* semi-transparent white */
+    backdrop-filter: blur(4px);          /* blur background behind */
+    -webkit-backdrop-filter: blur(4px);  /* Safari support */
+    box-shadow: 0 12px 40px rgba(0,0,0,.25);
+    padding: 18px;
+    text-align: center;
     }
     .card h1 { font-size: 1.1rem; margin: 6px 0 10px; }
     .card p { font-size: .95rem; margin: 0 10px 12px; }
