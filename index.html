@@ -17,14 +17,11 @@
       font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
       background: #000; /* fallback */
     }
-
-    /* Single background layer */
     #bg {
       position: fixed;
       inset: 0;
       background: center center / cover no-repeat;
     }
-
     .gate {
       position: fixed;
       inset: 0;
@@ -56,9 +53,7 @@
     }
     .btn-allow { background: #0b6efd; color: #fff; }
     .btn-deny { background: #eee; color: #111; }
-
     .hidden { display:none !important; }
-
     .widget-container {
       position: fixed;
       bottom: 10px;
@@ -76,7 +71,6 @@
   </style>
 </head>
 <body>
-  <!-- Single background image -->
   <div id="bg" style="background-image:url('Background 1.png')"></div>
 
   <div class="gate" id="gate" role="dialog" aria-modal="true" aria-labelledby="gateTitle">
@@ -92,8 +86,8 @@
 
   <div class="widget-container hidden" id="widgetContainer"></div>
 
-  <!-- Background music (not user controllable) -->
-  <audio id="bgMusic" src="Background Music.mp3" loop preload="auto"></audio>
+  <!-- Background music -->
+  <audio id="bgMusic" src="Background Music.mp3" loop preload="auto" playsinline webkit-playsinline></audio>
 
   <script>
     const AGENT_ID = "agent_4401k3npmamcf5hawj56bagnz96v";
@@ -110,8 +104,8 @@
     const listenImages = ["bg_listen_2.png","bg_listen_3.png","bg_listen_4.png"];
     const allImages    = ["Background 1.png","background_convo.png",...talkImages,...listenImages];
 
-    // Preload images
-    allImages.forEach(src => { const img = new Image(); img.src = src; });
+    // preload
+    allImages.forEach(src => { const i = new Image(); i.src = src; });
 
     function setBackground(img) {
       bg.style.backgroundImage = `url('${img}')`;
@@ -122,9 +116,8 @@
       setBackground(images[Math.floor(Math.random() * images.length)]);
       cycleInterval = setInterval(() => {
         setBackground(images[Math.floor(Math.random() * images.length)]);
-      }, 2000); // cycle speed (2s as you preferred)
+      }, 2000);
     }
-
     function stopCycle() {
       if (cycleInterval) {
         clearInterval(cycleInterval);
@@ -136,10 +129,8 @@
       setTimeout(() => {
         const root = widgetEl.shadowRoot;
         if (!root) return;
-
         const observer = new MutationObserver(() => {
           const txt = root.textContent.toLowerCase();
-
           if (txt.includes("listening")) {
             startCycle(listenImages);
           } else if (txt.includes("talk to interrupt")) {
@@ -155,18 +146,35 @@
 
     function injectWidget() {
       if (!document.querySelector('script[src*="elevenlabs.io/convai-widget/index.js"]')) {
-        const script = document.createElement("script");
-        script.src = "https://elevenlabs.io/convai-widget/index.js";
-        script.async = true;
-        script.setAttribute("data-elevenlabs-convai", "true");
-        document.body.appendChild(script);
+        const s = document.createElement("script");
+        s.src = "https://elevenlabs.io/convai-widget/index.js";
+        s.async = true;
+        s.setAttribute("data-elevenlabs-convai", "true");
+        document.body.appendChild(s);
       }
-
       widgetContainer.innerHTML = `<elevenlabs-convai agent-id="${AGENT_ID}" style="--voice-volume:1;"></elevenlabs-convai>`;
       widgetContainer.classList.remove("hidden");
-
       const widget = widgetContainer.querySelector("elevenlabs-convai");
       attachFallbackWatcher(widget);
+    }
+
+    // -------- AUDIO MIX FIX (like in the reference) --------
+    let audioCtx, bgGainNode;
+    function setupAudio() {
+      if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        bgGainNode = audioCtx.createGain();
+        bgGainNode.gain.value = 0.2; // background at 20%
+
+        const src = audioCtx.createMediaElementSource(bgMusic);
+        src.connect(bgGainNode).connect(audioCtx.destination);
+
+        window.audioCtx = audioCtx;
+        window.bgGainNode = bgGainNode;
+      }
+      if (audioCtx.state === "suspended") {
+        audioCtx.resume().catch(()=>{});
+      }
     }
 
     async function startExperience() {
@@ -179,11 +187,11 @@
 
       gate.classList.add("hidden");
 
-      // 🎵 Start background music at soft volume (20%)
-      bgMusic.volume = 0.2;
-      bgMusic.play().catch(err => console.log("Autoplay blocked:", err));
+      // setup Web Audio graph and play music at fixed soft level
+      setupAudio();
+      bgMusic.play().catch(err => console.log("Music autoplay blocked:", err));
 
-      // 🎙 Voice stays at 100% by default
+      // widget voice stays at full (100%)
       injectWidget();
     }
 
