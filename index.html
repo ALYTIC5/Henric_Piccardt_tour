@@ -2,50 +2,83 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no"
+  />
   <title>Henric Piccardt Tour</title>
+  <meta name="theme-color" content="#1d1d1b" />
   <style>
-    html, body {
-      margin: 0;
-      height: 100%;
-      overflow: hidden;
+    :root {
+      --vh: 1vh;
+      --safe-bottom: env(safe-area-inset-bottom, 0px);
     }
+    html, body {
+      height: calc(var(--vh) * 100);
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+    }
+
+    /* Background image */
     .bg {
       position: fixed;
       inset: 0;
       background: url("Background 1.png") center center / cover no-repeat;
-      transition: background-image 0.5s ease;
+      transition: background-image .5s ease;
     }
+    .bg.conversation {
+      background-image: url("background_convo.png");
+    }
+
+    /* Permission Gate */
     .gate {
       position: fixed;
       inset: 0;
       display: flex;
       justify-content: center;
-      align-items: center;
+      align-items: flex-end;
+      padding-bottom: 18%;
       z-index: 20;
-      background: rgba(0,0,0,0.4);
+      background: rgba(0,0,0,0.12);
     }
     .card {
-      padding: 20px;
-      border-radius: 12px;
-      background: #fff;
-      box-shadow: 0 4px 20px rgba(0,0,0,.3);
+      width: min(90vw, 420px);
+      border-radius: 18px;
+      background: rgba(255,255,255,0.95);
+      box-shadow: 0 12px 40px rgba(0,0,0,.25);
+      padding: 18px;
       text-align: center;
     }
-    .btn { padding: 10px 16px; border-radius: 8px; cursor: pointer; }
+    .card h1 { font-size: 1.1rem; margin: 6px 0 10px; }
+    .card p { font-size: .95rem; margin: 0 0 12px; }
+    .row { display: flex; gap: 10px; }
+    .btn {
+      flex: 1 1 auto;
+      padding: 12px 14px;
+      border-radius: 12px;
+      border: 2px solid transparent;
+      font-weight: 600;
+      cursor: pointer;
+    }
     .btn-allow { background: #0b6efd; color: #fff; }
     .btn-deny { background: #eee; color: #111; }
-    .hidden { display: none; }
+
+    .hidden { display:none !important; }
+
+    /* Widget container */
     .widget-container {
       position: fixed;
-      bottom: 20px;
+      bottom: calc(var(--safe-bottom) + 10px);
       left: 50%;
       transform: translateX(-50%);
       width: 92%;
       max-width: 480px;
       z-index: 10;
     }
-    .widget-container > elevenlabs-convai {
+    .widget-container > elevenlabs-convai,
+    .widget-container iframe {
       width: 100%;
       height: 140px;
     }
@@ -54,23 +87,28 @@
 <body>
   <div class="bg" id="bg"></div>
 
-  <div class="gate" id="gate">
+  <!-- Permission Gate -->
+  <div class="gate" id="gate" role="dialog" aria-modal="true" aria-labelledby="gateTitle">
     <div class="card">
-      <h2>Enable voice for your tour?</h2>
+      <h1 id="gateTitle">Enable voice for your tour?</h1>
       <p>This tour uses the ElevenLabs voice agent and needs access to your microphone.</p>
-      <button class="btn btn-deny" id="denyBtn">Not now</button>
-      <button class="btn btn-allow" id="allowBtn">Allow</button>
+      <div class="row">
+        <button class="btn btn-deny" id="denyBtn">Not now</button>
+        <button class="btn btn-allow" id="allowBtn">Allow</button>
+      </div>
     </div>
   </div>
 
+  <!-- Where ElevenLabs widget will mount -->
   <div class="widget-container hidden" id="widgetContainer"></div>
 
+  <!-- Background Music -->
   <audio id="bgMusic" src="Background Music.mp3" loop></audio>
 
-  <script src="https://js.elevenlabs.io/convai-widget/index.js" data-elevenlabs-convai="true"></script>
   <script>
     const AGENT_ID = "agent_4401k3npmamcf5hawj56bagnz96v";
-    const bg = document.getElementById("bg");
+
+    const bg   = document.getElementById("bg");
     const gate = document.getElementById("gate");
     const allowBtn = document.getElementById("allowBtn");
     const denyBtn = document.getElementById("denyBtn");
@@ -80,8 +118,8 @@
     let talkInterval = null;
     let toggle = false;
 
-    function setBackground(image) {
-      bg.style.backgroundImage = `url('${image}')`;
+    function setBackground(url) {
+      bg.style.backgroundImage = `url('${url}')`;
     }
 
     function startTalking() {
@@ -102,13 +140,17 @@
     }
 
     function injectWidget() {
-      widgetContainer.innerHTML =
-        `<elevenlabs-convai agent-id="${AGENT_ID}" style="--voice-volume:1;"></elevenlabs-convai>`;
+      if (!document.querySelector('script[src*="elevenlabs.io/convai-widget/index.js"]')) {
+        const script = document.createElement("script");
+        script.src = "https://elevenlabs.io/convai-widget/index.js";
+        script.async = true;
+        script.setAttribute("data-elevenlabs-convai", "true");
+        document.body.appendChild(script);
+      }
+      widgetContainer.innerHTML = `<elevenlabs-convai agent-id="${AGENT_ID}" style="--voice-volume:1;"></elevenlabs-convai>`;
       widgetContainer.classList.remove("hidden");
 
       const widget = widgetContainer.querySelector("elevenlabs-convai");
-
-      // Hook into session config
       widget.addEventListener("elevenlabs-convai:call", (e) => {
         e.detail.config.onModeChange = ({ mode }) => {
           if (mode === "speaking") {
@@ -128,18 +170,32 @@
       try {
         await navigator.mediaDevices.getUserMedia({ audio: true });
       } catch {
-        alert("Microphone permission denied.");
+        alert("Microphone permission denied. Please enable it to use the voice tour.");
         return;
       }
-      setBackground("background_convo.png");
+
+      // change background to conversation
+      bg.classList.add("conversation");
+
+      // hide permission box
       gate.classList.add("hidden");
+
+      // play background music
       bgMusic.volume = 0.15;
-      bgMusic.play().catch(() => {});
+      bgMusic.play().catch(err => console.log("Autoplay blocked:", err));
+
+      // load & mount ElevenLabs widget
       injectWidget();
     }
 
     allowBtn.addEventListener("click", startExperience);
-    denyBtn.addEventListener("click", () => gate.classList.add("hidden"));
+    denyBtn.addEventListener("click", () => {
+      gate.classList.add("hidden");
+    });
+
+    // viewport height fix
+    const setVH = () => document.documentElement.style.setProperty("--vh", `${window.innerHeight * 0.01}px`);
+    setVH(); window.addEventListener("resize", setVH);
   </script>
 </body>
 </html>
