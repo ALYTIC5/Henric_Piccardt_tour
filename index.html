@@ -25,6 +25,19 @@
       background: center center / cover no-repeat;
     }
 
+    /* Nameplate (shown after permission granted) */
+    #nameplate {
+      position: fixed;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      max-width: 70%;
+      height: auto;
+      z-index: 15;            /* above background & widget UI */
+      pointer-events: none;   /* never blocks clicks */
+    }
+    .hidden { display: none !important; }
+
     /* Permission gate */
     .gate {
       position: fixed;
@@ -37,14 +50,14 @@
       background: rgba(0,0,0,0.05); /* lowered so FRAEYLEMABORG remains clearly visible */
     }
     .card {
-    width: min(90vw, 420px);
-    border-radius: 18px;
-    background: rgba(255,255,255,0.85); /* semi-transparent white */
-    backdrop-filter: blur(4px);          /* blur background behind */
-    -webkit-backdrop-filter: blur(4px);  /* Safari support */
-    box-shadow: 0 12px 40px rgba(0,0,0,.25);
-    padding: 18px;
-    text-align: center;
+      width: min(90vw, 420px);
+      border-radius: 18px;
+      background: rgba(255,255,255,0.85); /* semi-transparent white */
+      backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
+      box-shadow: 0 12px 40px rgba(0,0,0,.25);
+      padding: 18px;
+      text-align: center;
     }
     .card h1 { font-size: 1.1rem; margin: 6px 0 10px; }
     .card p { font-size: .95rem; margin: 0 10px 12px; }
@@ -60,19 +73,8 @@
     .btn-allow { background: #0b6efd; color: #fff; }
     .btn-deny { background: #eee; color: #111; }
 
-    .small {
-      font-size: 0.86rem;
-      color: #333;
-      margin-top: 8px;
-    }
-    .link {
-      color: #0b6efd;
-      text-decoration: underline;
-      cursor: pointer;
-      font-weight: 600;
-    }
-
-    .hidden { display:none !important; }
+    .small { font-size: 0.86rem; color: #333; margin-top: 8px; }
+    .link { color: #0b6efd; text-decoration: underline; cursor: pointer; font-weight: 600; }
 
     .widget-container {
       position: fixed;
@@ -98,34 +100,29 @@
       padding: 0;
       max-height: 80vh;
     }
-    dialog::backdrop {
-      background: rgba(0,0,0,0.45);
-    }
-    .dialog-body {
-      padding: 18px 18px 6px;
-    }
+    dialog::backdrop { background: rgba(0,0,0,0.45); }
+    .dialog-body { padding: 18px 18px 6px; }
     .dialog-header {
       display:flex; align-items:center; justify-content:space-between;
-      padding: 14px 16px;
-      border-bottom: 1px solid #eee;
+      padding: 14px 16px; border-bottom: 1px solid #eee;
     }
-    .dialog-title {
-      margin:0; font-size: 1rem; font-weight: 800;
-    }
+    .dialog-title { margin:0; font-size: 1rem; font-weight: 800; }
     .dialog-close {
       border:none; background:#eee; color:#111; font-weight:700;
       padding:8px 12px; border-radius:10px; cursor:pointer;
     }
     .dialog-content {
       padding: 0 16px 16px;
-      font-size: .95rem; line-height: 1.45;
-      white-space: pre-wrap;
+      font-size: .95rem; line-height: 1.45; white-space: pre-wrap;
     }
   </style>
 </head>
 <body>
   <!-- Background image with the venue name -->
   <div id="bg" style="background-image:url('Background 1.png')"></div>
+
+  <!-- Nameplate (ornate golden text PNG with transparent bg) -->
+  <img id="nameplate" class="hidden" src="name-removebg.png" alt="Henric Piccardt" />
 
   <!-- Permission Gate -->
   <div class="gate" id="gate" role="dialog" aria-modal="true" aria-labelledby="gateTitle">
@@ -181,6 +178,7 @@ Contact: support@finetune.audio
     const denyBtn = document.getElementById("denyBtn");
     const widgetContainer = document.getElementById("widgetContainer");
     const bgMusic = document.getElementById("bgMusic");
+    const nameplate = document.getElementById("nameplate");
 
     // Privacy dialog hooks
     const privacyDialog = document.getElementById("privacyDialog");
@@ -257,7 +255,7 @@ Contact: support@finetune.audio
       if (!audioCtx) {
         audioCtx = new (window.AudioContext || window.webkitAudioContext)();
         bgGainNode = audioCtx.createGain();
-        bgGainNode.gain.value = 0.2; // background at 20% of full scale
+        bgGainNode.gain.value = 0.2; // background at 20%
 
         const src = audioCtx.createMediaElementSource(bgMusic);
         src.connect(bgGainNode).connect(audioCtx.destination);
@@ -279,6 +277,9 @@ Contact: support@finetune.audio
       }
 
       gate.classList.add("hidden");
+
+      // Show ornate nameplate permanently after permission is granted
+      nameplate.classList.remove("hidden");
 
       // Start soft background music (20%) and mount widget at full voice volume
       setupAudio();
