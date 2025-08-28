@@ -25,7 +25,7 @@
       position: fixed;
       inset: 0;
       background: url("Background 1.png") center center / cover no-repeat;
-      transition: background-image .45s ease; /* smoother swaps */
+      transition: background-image .5s ease;
     }
     .bg.conversation {
       background-image: url("background_convo.png");
@@ -108,86 +108,21 @@
     const widgetContainer = document.getElementById("widgetContainer");
     const bgMusic = document.getElementById("bgMusic");
 
-    // ---------- IMAGE & ANIMATION CONFIG ----------
-    const IMG = {
-      LISTEN_3: "bg_listening_3.png",
-      LISTEN_4: "bg_listening_4.png",
-      TALK_FRAMES: [
-        "bg_talk_1.png",
-        "bg_talk_2.png",
-        "bg_talk_3.png",
-        "bg_talk_4.png",
-        "bg_talk_5.png",
-        "bg_talk_6.png"
-      ]
-    };
-
-    const SPEED = {
-      LISTEN_STEP_MS: 520,  // slower nod cadence (was 180ms)
-      TALK_STEP_MS: 420,    // slower talk frame swap (was 110ms)
-      LISTEN_AFTER_TALK_PAUSE_MS: 350 // brief settle after talking ends
-    };
-
-    // ---------- STATE ----------
-    let state = "listening"; // "listening" | "talking"
     let talkInterval = null;
-    let listenTimer = null;
+    let talkToggle = false;
 
     function setBackground(img) {
-      // small guard to avoid redundant paints
-      const current = bg.style.backgroundImage || "";
-      const next = `url("${img}")`;
-      if (!current.endsWith(next.replace(/"/g, "'")) && !current.endsWith(next)) {
-        bg.style.backgroundImage = `url('${img}')`;
-      }
+      bg.style.backgroundImage = `url('${img}')`;
     }
 
-    // ----- LISTENING NOD: 3 -> 4 -> 3 -----
-    function playListeningNod(onDone) {
-      stopListeningNod(); // clear any in-flight nod
-
-      // If state flipped to talking before we start, bail
-      if (state !== "listening") return;
-
-      setBackground(IMG.LISTEN_3);
-      listenTimer = setTimeout(() => {
-        if (state !== "listening") return; // preempted by talking
-        setBackground(IMG.LISTEN_4);
-        listenTimer = setTimeout(() => {
-          if (state !== "listening") return;
-          setBackground(IMG.LISTEN_3);
-          listenTimer = null;
-          onDone && onDone();
-        }, SPEED.LISTEN_STEP_MS);
-      }, SPEED.LISTEN_STEP_MS);
-    }
-
-    function stopListeningNod() {
-      if (listenTimer) {
-        clearTimeout(listenTimer);
-        listenTimer = null;
-      }
-    }
-
-    // ----- TALKING ANIMATION -----
     function startTalkingCycle() {
-      if (state === "talking") return;
-      state = "talking";
-
-      stopListeningNod();
-      stopTalkingCycle(); // ensure clean start
-
-      if (!IMG.TALK_FRAMES.length) return;
-
-      // cycle all talk frames at a natural pace
-      let i = 0;
-      setBackground(IMG.TALK_FRAMES[0]);
+      stopTalkingCycle();
+      talkToggle = false;
+      setBackground("bg_talk_1.png");
       talkInterval = setInterval(() => {
-        // If state flipped back to listening, stop cycling immediately
-        if (state !== "talking") return stopTalkingCycle();
-        i = (i + 1) % IMG.TALK_FRAMES.length;
-        setBackground(IMG.TALK_FRAMES[i]);
-      }, SPEED.TALK_STEP_MS);
+        talkToggle = !talkToggle;
+        setBackground(talkToggle ? "bg_talk_2.png" : "bg_talk_1.png");
+      }, 3000);
     }
 
     function stopTalkingCycle() {
@@ -197,69 +132,28 @@
       }
     }
 
-    // ----- STATE SWITCH HELPERS -----
-    function toTalking() {
-      if (state === "talking") return;
-      startTalkingCycle();
-    }
-
-    function toListening() {
-      if (state === "listening") return;
-      state = "listening";
-      stopTalkingCycle();
-
-      // settle briefly, then do a nod (3->4->3)
-      setTimeout(() => {
-        if (state !== "listening") return; // guard
-        playListeningNod();
-      }, SPEED.LISTEN_AFTER_TALK_PAUSE_MS);
-    }
-
-    // ---------- FALLBACK WIDGET WATCHER ----------
     function attachFallbackWatcher(widgetEl) {
       setTimeout(() => {
         const root = widgetEl.shadowRoot;
         if (!root) return;
-
-        let lastDetected = null;
-
         const observer = new MutationObserver(() => {
-          const txt = (root.textContent || "").toLowerCase();
+          const txt = root.textContent.toLowerCase();
+          // console.log("Widget status text:", txt);
 
-          const speaking =
-            txt.includes("talk to interrupt") ||
-            txt.includes("speaking") ||
-            txt.includes("playing") ||
-            txt.includes("agent is talking");
-
-          const listening =
-            txt.includes("listening") ||
-            txt.includes("say something") ||
-            txt.includes("awaiting") ||
-            txt.includes("your turn");
-
-          // Only react on changes to avoid thrashing
-          const detected = speaking ? "talking" : listening ? "listening" : lastDetected;
-          if (!detected || detected === lastDetected) return;
-          lastDetected = detected;
-
-          if (detected === "talking") {
-            toTalking();
-          } else if (detected === "listening") {
-            toListening();
+          if (txt.includes("listening")) {
+            stopTalkingCycle();
+            setBackground("bg_listen_3.png");
+          } else if (txt.includes("talk to interrupt")) {
+            startTalkingCycle();
+          } else {
+            stopTalkingCycle();
+            setBackground("background_convo.png");
           }
         });
-
         observer.observe(root, { subtree: true, characterData: true, childList: true });
-
-        // Start in listening pose with a gentle nod
-        state = "listening";
-        setBackground(IMG.LISTEN_3);
-        playListeningNod();
       }, 300);
     }
 
-    // ---------- ELEVENLABS WIDGET ----------
     function injectWidget() {
       if (!document.querySelector('script[src*="elevenlabs.io/convai-widget/index.js"]')) {
         const script = document.createElement("script");
@@ -269,42 +163,13 @@
         document.body.appendChild(script);
       }
 
-      widgetContainer.innerHTML =
-        `<elevenlabs-convai agent-id="${AGENT_ID}" style="--voice-volume:1;"></elevenlabs-convai>`;
+      widgetContainer.innerHTML = `<elevenlabs-convai agent-id="${AGENT_ID}" style="--voice-volume:1;"></elevenlabs-convai>`;
       widgetContainer.classList.remove("hidden");
 
       const widget = widgetContainer.querySelector("elevenlabs-convai");
-
-      // Bind known events (preferred)
-      const onTtsStart = () => toTalking();
-      const onTtsStop  = () => toListening();
-      ["playback-start","speech-start","audio-start","conversation-start","agent-speaks-start"]
-        .forEach(evt => widget.addEventListener(evt, onTtsStart));
-      ["playback-complete","playback-end","speech-end","audio-end","conversation-end","agent-speaks-end","playback-error"]
-        .forEach(evt => widget.addEventListener(evt, onTtsStop));
-
-      // Fallback shadow <audio> binding
-      const tryBindAudio = () => {
-        try {
-          const root = widget.shadowRoot;
-          if (!root) return false;
-          const audio = root.querySelector("audio");
-          if (!audio) return false;
-          audio.addEventListener("play", onTtsStart);
-          audio.addEventListener("pause", onTtsStop);
-          audio.addEventListener("ended", onTtsStop);
-          return true;
-        } catch { return false; }
-      };
-      let attempts = 0;
-      const poll = setInterval(() => {
-        if (tryBindAudio() || attempts++ > 40) clearInterval(poll);
-      }, 250);
-
       attachFallbackWatcher(widget);
     }
 
-    // ---------- EXPERIENCE FLOW ----------
     async function startExperience() {
       try {
         await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -314,17 +179,14 @@
       }
 
       bg.classList.add("conversation");
-      setBackground(IMG.LISTEN_3);
+      setBackground("background_convo.png");
 
       gate.classList.add("hidden");
 
       bgMusic.volume = 0.15;
-      bgMusic.play().catch(()=>{});
+      bgMusic.play().catch(err => console.log("Autoplay blocked:", err));
 
       injectWidget();
-
-      // initial nod so the character feels alive
-      playListeningNod();
     }
 
     allowBtn.addEventListener("click", startExperience);
