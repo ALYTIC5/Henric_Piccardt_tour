@@ -25,13 +25,13 @@
       background: center center / cover no-repeat;
     }
 
-    /* Nameplate (smaller now) */
+    /* Nameplate */
     #nameplate {
       position: fixed;
-      top: 0px;
+      top: 50%;                 /* middle vertically */
       left: 50%;
-      transform: translateX(-50%);
-      max-width: 40%;          /* reduced size (was 70%) */
+      transform: translate(-50%, -50%); /* perfect center */
+      max-width: 55%;           /* in between size */
       height: auto;
       z-index: 15;
       pointer-events: none;
@@ -39,6 +39,7 @@
       transition: opacity 1.2s ease-in;
     }
     #nameplate.visible { opacity: 1; }
+
     .hidden { display: none !important; }
 
     /* Permission gate */
