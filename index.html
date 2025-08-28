@@ -107,8 +107,7 @@
 
   <script>
     const AGENT_ID = "agent_4401k3npmamcf5hawj56bagnz96v";
-
-    const bg   = document.getElementById("bg");
+    const bg = document.getElementById("bg");
     const gate = document.getElementById("gate");
     const allowBtn = document.getElementById("allowBtn");
     const denyBtn = document.getElementById("denyBtn");
@@ -121,8 +120,9 @@
     function setBackground(img) {
       bg.style.backgroundImage = `url('${img}')`;
     }
-    function startTalking() {
-      stopTalking();
+
+    function startTalkingCycle() {
+      stopTalkingCycle();
       talkToggle = false;
       setBackground("bg_talk_1.png");
       talkInterval = setInterval(() => {
@@ -130,11 +130,33 @@
         setBackground(talkToggle ? "bg_talk_2.png" : "bg_talk_1.png");
       }, 3000);
     }
-    function stopTalking() {
+
+    function stopTalkingCycle() {
       if (talkInterval) {
         clearInterval(talkInterval);
         talkInterval = null;
       }
+    }
+
+    function attachFallbackWatcher(widgetEl) {
+      // Watch text inside the widget's shadow DOM to detect speaking/listening
+      setTimeout(() => {
+        const root = widgetEl.shadowRoot;
+        if (!root) return;
+        const observer = new MutationObserver(() => {
+          const txt = root.textContent || "";
+          if (txt.match(/listening/i)) {
+            stopTalkingCycle();
+            setBackground("bg_listen_3.png");
+          } else if (txt.match(/assistant speaking/i)) {
+            startTalkingCycle();
+          } else {
+            stopTalkingCycle();
+            setBackground("background_convo.png");
+          }
+        });
+        observer.observe(root, { subtree: true, characterData: true, childList: true });
+      }, 300);
     }
 
     function injectWidget() {
@@ -145,24 +167,12 @@
         script.setAttribute("data-elevenlabs-convai", "true");
         document.body.appendChild(script);
       }
+
       widgetContainer.innerHTML = `<elevenlabs-convai agent-id="${AGENT_ID}" style="--voice-volume:1;"></elevenlabs-convai>`;
       widgetContainer.classList.remove("hidden");
 
       const widget = widgetContainer.querySelector("elevenlabs-convai");
-      widget.addEventListener("elevenlabs-convai:call", (event) => {
-        // inject mode change callback
-        event.detail.config.onModeChange = ({ mode }) => {
-          if (mode === "speaking") {
-            startTalking();
-          } else if (mode === "listening") {
-            stopTalking();
-            setBackground("bg_listen_3.png");
-          } else {
-            stopTalking();
-            setBackground("background_convo.png");
-          }
-        };
-      });
+      attachFallbackWatcher(widget);
     }
 
     async function startExperience() {
@@ -173,29 +183,23 @@
         return;
       }
 
-      // change background to conversation
       bg.classList.add("conversation");
       setBackground("background_convo.png");
 
-      // hide permission box
       gate.classList.add("hidden");
 
-      // play background music at fixed volume
       bgMusic.volume = 0.15;
       bgMusic.play().catch(err => console.log("Autoplay blocked:", err));
 
-      // load & mount ElevenLabs widget
       injectWidget();
     }
 
     allowBtn.addEventListener("click", startExperience);
-    denyBtn.addEventListener("click", () => {
-      gate.classList.add("hidden");
-    });
+    denyBtn.addEventListener("click", () => gate.classList.add("hidden"));
 
-    // viewport height fix
     const setVH = () => document.documentElement.style.setProperty("--vh", `${window.innerHeight * 0.01}px`);
-    setVH(); window.addEventListener("resize", setVH);
+    setVH();
+    window.addEventListener("resize", setVH);
   </script>
 </body>
 </html>
