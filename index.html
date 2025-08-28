@@ -25,10 +25,10 @@
       background: center center / cover no-repeat;
     }
 
-    /* Nameplate (shown after permission granted) */
+    /* Nameplate (shown after permission granted, moved slightly higher) */
     #nameplate {
       position: fixed;
-      top: 20px;
+      top: 8px;               /* moved a bit higher (was 20px) */
       left: 50%;
       transform: translateX(-50%);
       max-width: 70%;
@@ -278,8 +278,10 @@ Contact: support@finetune.audio
 
       gate.classList.add("hidden");
 
-      // Show ornate nameplate permanently after permission is granted
-      nameplate.classList.remove("hidden");
+      // Show ornate nameplate 3 seconds after permission
+      setTimeout(() => {
+        nameplate.classList.remove("hidden");
+      }, 3000);
 
       // Start soft background music (20%) and mount widget at full voice volume
       setupAudio();
