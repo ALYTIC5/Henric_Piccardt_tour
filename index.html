@@ -2,83 +2,50 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta
-    name="viewport"
-    content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no"
-  />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Henric Piccardt Tour</title>
-  <meta name="theme-color" content="#1d1d1b" />
   <style>
-    :root {
-      --vh: 1vh;
-      --safe-bottom: env(safe-area-inset-bottom, 0px);
-    }
     html, body {
-      height: calc(var(--vh) * 100);
       margin: 0;
-      padding: 0;
+      height: 100%;
       overflow: hidden;
-      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
     }
-
-    /* Background image */
     .bg {
       position: fixed;
       inset: 0;
       background: url("Background 1.png") center center / cover no-repeat;
-      transition: background-image .5s ease;
+      transition: background-image 0.5s ease;
     }
-    .bg.conversation {
-      background-image: url("background_convo.png");
-    }
-
-    /* Permission Gate */
     .gate {
       position: fixed;
       inset: 0;
       display: flex;
       justify-content: center;
-      align-items: flex-end;
-      padding-bottom: 18%;
+      align-items: center;
       z-index: 20;
-      background: rgba(0,0,0,0.12);
+      background: rgba(0,0,0,0.4);
     }
     .card {
-      width: min(90vw, 420px);
-      border-radius: 18px;
-      background: rgba(255,255,255,0.95);
-      box-shadow: 0 12px 40px rgba(0,0,0,.25);
-      padding: 18px;
+      padding: 20px;
+      border-radius: 12px;
+      background: #fff;
+      box-shadow: 0 4px 20px rgba(0,0,0,.3);
       text-align: center;
     }
-    .card h1 { font-size: 1.1rem; margin: 6px 0 10px; }
-    .card p { font-size: .95rem; margin: 0 0 12px; }
-    .row { display: flex; gap: 10px; }
-    .btn {
-      flex: 1 1 auto;
-      padding: 12px 14px;
-      border-radius: 12px;
-      border: 2px solid transparent;
-      font-weight: 600;
-      cursor: pointer;
-    }
+    .btn { padding: 10px 16px; border-radius: 8px; cursor: pointer; }
     .btn-allow { background: #0b6efd; color: #fff; }
     .btn-deny { background: #eee; color: #111; }
-
-    .hidden { display:none !important; }
-
-    /* Widget container */
+    .hidden { display: none; }
     .widget-container {
       position: fixed;
-      bottom: calc(var(--safe-bottom) + 10px);
+      bottom: 20px;
       left: 50%;
       transform: translateX(-50%);
       width: 92%;
       max-width: 480px;
       z-index: 10;
     }
-    .widget-container > elevenlabs-convai,
-    .widget-container iframe {
+    .widget-container > elevenlabs-convai {
       width: 100%;
       height: 140px;
     }
@@ -87,28 +54,23 @@
 <body>
   <div class="bg" id="bg"></div>
 
-  <!-- Permission Gate -->
-  <div class="gate" id="gate" role="dialog" aria-modal="true" aria-labelledby="gateTitle">
+  <div class="gate" id="gate">
     <div class="card">
-      <h1 id="gateTitle">Enable voice for your tour?</h1>
+      <h2>Enable voice for your tour?</h2>
       <p>This tour uses the ElevenLabs voice agent and needs access to your microphone.</p>
-      <div class="row">
-        <button class="btn btn-deny" id="denyBtn">Not now</button>
-        <button class="btn btn-allow" id="allowBtn">Allow</button>
-      </div>
+      <button class="btn btn-deny" id="denyBtn">Not now</button>
+      <button class="btn btn-allow" id="allowBtn">Allow</button>
     </div>
   </div>
 
-  <!-- Where ElevenLabs widget will mount -->
   <div class="widget-container hidden" id="widgetContainer"></div>
 
-  <!-- Background Music -->
   <audio id="bgMusic" src="Background Music.mp3" loop></audio>
 
+  <script src="https://js.elevenlabs.io/convai-widget/index.js" data-elevenlabs-convai="true"></script>
   <script>
     const AGENT_ID = "agent_4401k3npmamcf5hawj56bagnz96v";
-
-    const bg   = document.getElementById("bg");
+    const bg = document.getElementById("bg");
     const gate = document.getElementById("gate");
     const allowBtn = document.getElementById("allowBtn");
     const denyBtn = document.getElementById("denyBtn");
@@ -116,126 +78,68 @@
     const bgMusic = document.getElementById("bgMusic");
 
     let talkInterval = null;
-    let talkToggle = false;
+    let toggle = false;
 
-    function stopTalkingCycle() {
+    function setBackground(image) {
+      bg.style.backgroundImage = `url('${image}')`;
+    }
+
+    function startTalking() {
+      stopTalking();
+      toggle = false;
+      setBackground("bg_talk_1.png");
+      talkInterval = setInterval(() => {
+        toggle = !toggle;
+        setBackground(toggle ? "bg_talk_2.png" : "bg_talk_1.png");
+      }, 3000);
+    }
+
+    function stopTalking() {
       if (talkInterval) {
         clearInterval(talkInterval);
         talkInterval = null;
       }
     }
 
-    function setBackground(src) {
-      // Use inline style so it can override earlier class-based backgrounds.
-      bg.style.backgroundImage = `url('${src}')`;
-    }
-
-    function handleWidgetState(state) {
-      if (state === "listening") {
-        stopTalkingCycle();
-        setBackground("bg_listen_3.png"); // your listening background
-      } else if (state === "talking") {
-        // start/keep a 3s alternating cycle between the two talk images
-        if (!talkInterval) {
-          // set one immediately, then alternate
-          talkToggle = false;
-          setBackground("bg_talk_1.png");
-          talkInterval = setInterval(() => {
-            talkToggle = !talkToggle;
-            setBackground(talkToggle ? "bg_talk_2.png" : "bg_talk_1.png");
-          }, 3000);
-        }
-      } else {
-        // any other state -> show conversation background
-        stopTalkingCycle();
-        setBackground("background_convo.png");
-      }
-    }
-
-    function wireUpStateWatcher() {
-      // Observe the widget for attribute changes that expose its state.
-      const widget = document.querySelector("elevenlabs-convai");
-      if (!widget) return;
-
-      // 1) If the widget reflects state via attributes (e.g., state="listening"/"talking")
-      const attrObserver = new MutationObserver(mutations => {
-        for (const m of mutations) {
-          if (m.type === "attributes" && m.attributeName === "state") {
-            const s = widget.getAttribute("state");
-            if (s) handleWidgetState(s);
-          }
-        }
-      });
-      attrObserver.observe(widget, { attributes: true });
-
-      // 2) Also listen to custom events if the widget dispatches them.
-      widget.addEventListener("statechange", (e) => {
-        // expecting e.detail.state if provided
-        if (e && e.detail && e.detail.state) {
-          handleWidgetState(e.detail.state);
-        }
-      });
-
-      // 3) Fallback: poll a readable state attribute if present
-      const poll = () => {
-        const s = widget.getAttribute("state");
-        if (s) handleWidgetState(s);
-      };
-      setInterval(poll, 1000);
-    }
-
     function injectWidget() {
-      if (!document.querySelector('script[src*="elevenlabs.io/convai-widget/index.js"]')) {
-        const script = document.createElement("script");
-        script.src = "https://elevenlabs.io/convai-widget/index.js";
-        script.async = true;
-        script.setAttribute("data-elevenlabs-convai", "true");
-        script.onload = () => wireUpStateWatcher();
-        document.body.appendChild(script);
-      }
-
-      widgetContainer.innerHTML = `<elevenlabs-convai agent-id="${AGENT_ID}" style="--voice-volume:1;"></elevenlabs-convai>`;
+      widgetContainer.innerHTML =
+        `<elevenlabs-convai agent-id="${AGENT_ID}" style="--voice-volume:1;"></elevenlabs-convai>`;
       widgetContainer.classList.remove("hidden");
 
-      // If the script was already present, still attach watchers.
-      if (document.querySelector('script[src*="elevenlabs.io/convai-widget/index.js"]')) {
-        // slight delay to ensure the custom element is upgraded
-        setTimeout(wireUpStateWatcher, 100);
-      }
+      const widget = widgetContainer.querySelector("elevenlabs-convai");
+
+      // Hook into session config
+      widget.addEventListener("elevenlabs-convai:call", (e) => {
+        e.detail.config.onModeChange = ({ mode }) => {
+          if (mode === "speaking") {
+            startTalking();
+          } else if (mode === "listening") {
+            stopTalking();
+            setBackground("bg_listen_3.png");
+          } else {
+            stopTalking();
+            setBackground("background_convo.png");
+          }
+        };
+      });
     }
 
     async function startExperience() {
       try {
-        // ask for mic permission
         await navigator.mediaDevices.getUserMedia({ audio: true });
       } catch {
-        alert("Microphone permission denied. Please enable it to use the voice tour.");
+        alert("Microphone permission denied.");
         return;
       }
-
-      // change background to conversation image immediately after permission
-      bg.classList.add("conversation"); // keeps your original behavior
-      setBackground("background_convo.png"); // ensures it's set even if classes change
-
-      // hide permission box
+      setBackground("background_convo.png");
       gate.classList.add("hidden");
-
-      // play background music at fixed volume
       bgMusic.volume = 0.15;
-      bgMusic.play().catch(err => console.log("Autoplay blocked:", err));
-
-      // load & mount ElevenLabs widget
+      bgMusic.play().catch(() => {});
       injectWidget();
     }
 
     allowBtn.addEventListener("click", startExperience);
-    denyBtn.addEventListener("click", () => {
-      gate.classList.add("hidden");
-    });
-
-    // viewport height fix
-    const setVH = () => document.documentElement.style.setProperty("--vh", `${window.innerHeight * 0.01}px`);
-    setVH(); window.addEventListener("resize", setVH);
+    denyBtn.addEventListener("click", () => gate.classList.add("hidden"));
   </script>
 </body>
 </html>
