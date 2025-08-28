@@ -18,7 +18,7 @@
       background: #000; /* fallback */
     }
 
-    /* Just one background layer now */
+    /* Single background layer */
     #bg {
       position: fixed;
       inset: 0;
@@ -76,7 +76,7 @@
   </style>
 </head>
 <body>
-  <!-- Single background layer -->
+  <!-- Single background image -->
   <div id="bg" style="background-image:url('Background 1.png')"></div>
 
   <div class="gate" id="gate" role="dialog" aria-modal="true" aria-labelledby="gateTitle">
@@ -92,7 +92,8 @@
 
   <div class="widget-container hidden" id="widgetContainer"></div>
 
-  <audio id="bgMusic" src="Background Music.mp3" loop></audio>
+  <!-- Background music (not user controllable) -->
+  <audio id="bgMusic" src="Background Music.mp3" loop preload="auto"></audio>
 
   <script>
     const AGENT_ID = "agent_4401k3npmamcf5hawj56bagnz96v";
@@ -121,7 +122,7 @@
       setBackground(images[Math.floor(Math.random() * images.length)]);
       cycleInterval = setInterval(() => {
         setBackground(images[Math.floor(Math.random() * images.length)]);
-      }, 2000); // change every 1.2s
+      }, 2000); // cycle speed (2s as you preferred)
     }
 
     function stopCycle() {
@@ -178,9 +179,11 @@
 
       gate.classList.add("hidden");
 
-      bgMusic.volume = 0.15;
+      // 🎵 Start background music at soft volume (20%)
+      bgMusic.volume = 0.2;
       bgMusic.play().catch(err => console.log("Autoplay blocked:", err));
 
+      // 🎙 Voice stays at 100% by default
       injectWidget();
     }
 
