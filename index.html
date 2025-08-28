@@ -18,24 +18,24 @@
       background: #000;
     }
 
-    /* Background layer */
+    /* Background layer (unchanged position) */
     #bg {
       position: fixed;
       inset: 0;
       background: center center / cover no-repeat;
     }
 
-    /* Nameplate */
+    /* Nameplate: top-center, same physical location, size between too small (40%) and too big (70%) */
     #nameplate {
       position: fixed;
-      top: 50%;                 /* middle vertically */
+      top: 0;                       /* very top */
       left: 50%;
-      transform: translate(-50%, -50%); /* perfect center */
-      max-width: 55%;           /* in between size */
+      transform: translateX(-50%);  /* centered horizontally */
+      max-width: 55%;               /* BETWEEN 40% and 70% */
       height: auto;
       z-index: 15;
       pointer-events: none;
-      opacity: 0;
+      opacity: 0;                   /* fade-in after permission */
       transition: opacity 1.2s ease-in;
     }
     #nameplate.visible { opacity: 1; }
@@ -236,7 +236,7 @@ Contact: support@finetune.audio
       attachFallbackWatcher(widget);
     }
 
-    // Background music setup
+    // Background music setup (voice 100%, music 20%)
     let audioCtx, bgGainNode;
     function setupAudio() {
       if (!audioCtx) {
@@ -259,7 +259,7 @@ Contact: support@finetune.audio
 
       gate.classList.add("hidden");
 
-      // Show nameplate with fade after 3s
+      // Fade in the nameplate (top-center) after 3 seconds
       setTimeout(() => {
         nameplate.classList.add("visible");
       }, 3000);
