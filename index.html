@@ -51,12 +51,16 @@
 
   <script>
     const AGENT_ID = "agent_4401k3npmamcf5hawj56bagnz96v";
+
     const bg = document.getElementById("bg");
     const gate = document.getElementById("gate");
     const allowBtn = document.getElementById("allowBtn");
     const denyBtn = document.getElementById("denyBtn");
     const widgetContainer = document.getElementById("widgetContainer");
     const bgMusic = document.getElementById("bgMusic");
+
+    // Mute the element's own output; all sound goes through Web Audio @ 0.2
+    bgMusic.volume = 0;
 
     let audioCtx, bgGainNode, mediaElSource, primed = false;
 
@@ -80,24 +84,29 @@
     }
 
     async function primeAudio() {
-      if (primed) return;
-      primed = true;
+      // Play muted during a gesture to satisfy autoplay policies
       try {
         await createOrResumeCtx();
         wireGraphOnce();
         bgMusic.muted = true;
         bgMusic.load();
         await bgMusic.play();
-      } catch (err) { primed = false; }
+        primed = true;
+      } catch (err) {
+        primed = false; // we'll try again on click
+      }
     }
 
-    function unmuteAndPlay() {
+    function robustPlayUnmuted() {
+      // Unmute and aggressively ensure playback continues
       bgMusic.muted = false;
-      const kick = () => bgMusic.play().catch(() => {});
-      kick(); [150,600,1200,2500].forEach(t => setTimeout(kick,t));
+      const tryPlay = () => bgMusic.play().catch(() => {});
+      tryPlay();
+      [100, 300, 800, 1500, 3000].forEach(t => setTimeout(tryPlay, t));
     }
 
     function injectWidget() {
+      // Primary + fallback loader
       function loadScript(src, cb) {
         const s = document.createElement("script");
         s.src = src; s.async = true;
@@ -117,28 +126,50 @@
     }
 
     async function startExperience() {
-      try { await navigator.mediaDevices.getUserMedia({ audio: true }); } 
+      // Ask mic inside the same gesture
+      try { await navigator.mediaDevices.getUserMedia({ audio: true }); }
       catch { alert("Microfoontoegang geweigerd."); return; }
 
+      // Make absolutely sure the audio graph exists before playing
+      await createOrResumeCtx();
+      wireGraphOnce();
+
+      // If we didn't manage to prime earlier, do it now (still inside click)
+      if (!primed) {
+        try {
+          bgMusic.muted = true;
+          bgMusic.load();
+          await bgMusic.play();
+          primed = true;
+        } catch {}
+      }
+
+      // Switch background and start music (unmuted) with retries
       gate.classList.add("hidden");
       bg.style.backgroundImage = "url('background_convo.png')";
-      unmuteAndPlay();
+      robustPlayUnmuted();
+
+      // Widget
       injectWidget();
     }
 
     // Event wiring
+    // Pre-prime on any early gesture for better iOS reliability
     ["pointerdown","touchstart","mousedown","keydown"].forEach(ev => {
       allowBtn.addEventListener(ev, primeAudio, { once: false });
     });
+    // Start on click
     allowBtn.addEventListener("click", startExperience);
     denyBtn.addEventListener("click", () => gate.classList.add("hidden"));
+    // One-time page-level prime (in case user taps elsewhere first)
     ["pointerdown","touchstart","mousedown","keydown"].forEach(ev => {
       document.addEventListener(ev, primeAudio, { once: true, capture: true });
     });
 
+    // If the tab regains focus or the context suspends, resume + ensure playback
     document.addEventListener("visibilitychange", () => {
       if (document.visibilityState === "visible") {
-        createOrResumeCtx().then(() => unmuteAndPlay());
+        createOrResumeCtx().then(() => robustPlayUnmuted());
       }
     });
   </script>
