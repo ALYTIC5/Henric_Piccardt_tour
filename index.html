@@ -5,80 +5,123 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no" />
   <title>Henric Piccardt Tour</title>
   <meta name="theme-color" content="#1d1d1b" />
-
-  <!-- Network warmups -->
-  <link rel="preconnect" href="https://elevenlabs.io" crossorigin>
-  <link rel="dns-prefetch" href="//elevenlabs.io">
-  <link rel="dns-prefetch" href="//unpkg.com">
-
-  <!-- Critical preloads (don’t block on all; we will decode the first on click) -->
-  <link rel="preload" as="image" href="background_convo.png">
-  <link rel="preload" as="audio" href="BG_Lower.mp3">
-
   <style>
-    html, body { height: 100%; margin: 0; padding: 0; overflow: hidden;
-      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; background: #000; }
+    html, body {
+      height: 100%;
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      background: #000;
+    }
 
-    #bg { position: fixed; inset: 0; background: center center / cover no-repeat; }
+    /* Background layer (unchanged position) */
+    #bg {
+      position: fixed;
+      inset: 0;
+      background: center center / cover no-repeat;
+    }
 
+    /* Nameplate: top-center, same physical location, size between too small (40%) and too big (70%) */
     #nameplate {
-      position: fixed; top: 0; left: 50%; transform: translateX(-50%);
-      max-width: 55%; height: auto; z-index: 15; pointer-events: none;
-      opacity: 0; transition: opacity 1.2s ease-in;
+      position: fixed;
+      top: 0;                       /* very top */
+      left: 50%;
+      transform: translateX(-50%);  /* centered horizontally */
+      max-width: 55%;               /* BETWEEN 40% and 70% */
+      height: auto;
+      z-index: 15;
+      pointer-events: none;
+      opacity: 0;                   /* fade-in after permission */
+      transition: opacity 1.2s ease-in;
     }
     #nameplate.visible { opacity: 1; }
 
     .hidden { display: none !important; }
 
     /* Permission gate */
-    .gate { position: fixed; inset: 0; display: flex; justify-content: center; align-items: flex-end;
-      padding-bottom: 18%; z-index: 20; background: rgba(0,0,0,0.05); }
-    .card { width: min(90vw, 420px); border-radius: 18px; background: rgba(255,255,255,0.85);
-      backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); box-shadow: 0 12px 40px rgba(0,0,0,.25);
-      padding: 18px; text-align: center; }
+    .gate {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      justify-content: center;
+      align-items: flex-end;
+      padding-bottom: 18%;
+      z-index: 20;
+      background: rgba(0,0,0,0.05);
+    }
+    .card {
+      width: min(90vw, 420px);
+      border-radius: 18px;
+      background: rgba(255,255,255,0.85);
+      backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
+      box-shadow: 0 12px 40px rgba(0,0,0,.25);
+      padding: 18px;
+      text-align: center;
+    }
     .card h1 { font-size: 1.1rem; margin: 6px 0 10px; }
     .card p { font-size: .95rem; margin: 0 10px 12px; }
     .row { display: flex; gap: 10px; }
-    .btn { flex: 1 1 auto; padding: 12px 14px; border-radius: 12px; border: 2px solid transparent;
-      font-weight: 600; cursor: pointer; }
-    .btn-allow { background: #0b6efd; color: #fff; }
-    .btn-deny  { background: #eee; color: #111; }
-    .small { font-size: 0.86rem; color: #333; margin-top: 8px; }
-    .link  { color: #0b6efd; text-decoration: underline; cursor: pointer; font-weight: 600; }
-
-    .widget-container { position: fixed; bottom: 10px; left: 50%; transform: translateX(-50%);
-      width: 92%; max-width: 480px; z-index: 10; }
-    .widget-container > elevenlabs-convai, .widget-container iframe { width: 100%; height: 140px; }
-
-    dialog.privacy { width: min(92vw, 560px); border: none; border-radius: 16px; box-shadow: 0 20px 60px rgba(0,0,0,.35);
-      padding: 0; max-height: 80vh; }
-    dialog::backdrop { background: rgba(0,0,0,0.45); }
-    .dialog-body  { padding: 18px 18px 6px; }
-    .dialog-header{ display:flex; align-items:center; justify-content:space-between;
-      padding: 14px 16px; border-bottom: 1px solid #eee; }
-    .dialog-title { margin:0; font-size: 1rem; font-weight: 800; }
-    .dialog-close { border:none; background:#eee; color:#111; font-weight:700; padding:8px 12px;
-      border-radius:10px; cursor:pointer; }
-    .dialog-content { padding: 0 16px 16px; font-size: .95rem; line-height: 1.45; white-space: pre-wrap; }
-
-    /* First-launch warm-up overlay (prevents black flash) */
-    #warmup {
-      position: fixed; inset: 0; background: #000; color: #fff; z-index: 9999;
-      display: none; align-items: center; justify-content: center; flex-direction: column;
-      font-weight: 700; letter-spacing: .2px;
+    .btn {
+      flex: 1 1 auto;
+      padding: 12px 14px;
+      border-radius: 12px;
+      border: 2px solid transparent;
+      font-weight: 600;
+      cursor: pointer;
     }
-    #warmup.show { display: flex; }
-    #warmup .dot { width: 6px; height: 6px; border-radius: 50%; background: #fff; margin: 8px 3px 0;
-      display: inline-block; opacity: .4; animation: pulse 1.2s infinite ease-in-out; }
-    #warmup .dot:nth-child(2){ animation-delay: .2s } #warmup .dot:nth-child(3){ animation-delay: .4s }
-    @keyframes pulse { 0%,100%{opacity:.3; transform: translateY(0)} 50%{opacity:1; transform: translateY(-2px)} }
+    .btn-allow { background: #0b6efd; color: #fff; }
+    .btn-deny { background: #eee; color: #111; }
+
+    .small { font-size: 0.86rem; color: #333; margin-top: 8px; }
+    .link { color: #0b6efd; text-decoration: underline; cursor: pointer; font-weight: 600; }
+
+    .widget-container {
+      position: fixed;
+      bottom: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 92%;
+      max-width: 480px;
+      z-index: 10;
+    }
+    .widget-container > elevenlabs-convai,
+    .widget-container iframe {
+      width: 100%;
+      height: 140px;
+    }
+
+    /* Privacy dialog */
+    dialog.privacy {
+      width: min(92vw, 560px);
+      border: none;
+      border-radius: 16px;
+      box-shadow: 0 20px 60px rgba(0,0,0,.35);
+      padding: 0;
+      max-height: 80vh;
+    }
+    dialog::backdrop { background: rgba(0,0,0,0.45); }
+    .dialog-body { padding: 18px 18px 6px; }
+    .dialog-header {
+      display:flex; align-items:center; justify-content:space-between;
+      padding: 14px 16px; border-bottom: 1px solid #eee;
+    }
+    .dialog-title { margin:0; font-size: 1rem; font-weight: 800; }
+    .dialog-close {
+      border:none; background:#eee; color:#111; font-weight:700;
+      padding:8px 12px; border-radius:10px; cursor:pointer;
+    }
+    .dialog-content {
+      padding: 0 16px 16px;
+      font-size: .95rem; line-height: 1.45; white-space: pre-wrap;
+    }
   </style>
 </head>
 <body>
   <div id="bg" style="background-image:url('Background 1.png')"></div>
   <img id="nameplate" src="name-removebg.png" alt="Henric Piccardt" />
 
-  <!-- Permission Gate -->
   <div class="gate" id="gate" role="dialog" aria-modal="true" aria-labelledby="gateTitle">
     <div class="card">
       <h1 id="gateTitle">Microfoon inschakelen?</h1>
@@ -87,18 +130,13 @@
         <button class="btn btn-deny" id="denyBtn">Niet nu</button>
         <button class="btn btn-allow" id="allowBtn">Toestaan</button>
       </div>
-      <p class="small">🌐 Uitgebreider privacy statement
-        (<span id="openPrivacy" class="link" role="button" tabindex="0" aria-controls="privacyDialog">lees meer</span>)</p>
+      <p class="small">
+        🌐 Uitgebreider privacy statement
+        (<span id="openPrivacy" class="link" role="button" tabindex="0" aria-controls="privacyDialog">lees meer</span>)
+      </p>
     </div>
   </div>
 
-  <!-- Warm-up overlay shown for ~1s after Allow (no jank/black) -->
-  <div id="warmup" aria-hidden="true">
-    <div>Even laden…</div>
-    <div><span class="dot"></span><span class="dot"></span><span class="dot"></span></div>
-  </div>
-
-  <!-- Privacy dialog -->
   <dialog id="privacyDialog" class="privacy" aria-labelledby="privacyTitle">
     <div class="dialog-header">
       <h2 class="dialog-title" id="privacyTitle">🌐 Uitgebreider privacy statement</h2>
@@ -125,17 +163,20 @@ Contact: support@finetune.audio
 
   <div class="widget-container hidden" id="widgetContainer"></div>
 
-  <!-- Background music (element output muted; routed via Web Audio @ 0.2 gain) -->
+  <!-- Background music: set to the attached BG_Lower.mp3.
+       Direct element output is muted; audio is routed via Web Audio at fixed 0.2 gain. -->
   <audio id="bgMusic" src="BG_Lower.mp3" loop preload="auto" playsinline webkit-playsinline></audio>
 
   <script>
-    /* ===================== CONFIG ===================== */
+    /* ====== CONFIG ====== */
     const AGENT_ID = "agent_4401k3npmamcf5hawj56bagnz96v";
-    const ALWAYS_BG = "background_convo.png";
-    const talkImages   = Array.from({length: 9}, (_, i) => `bg_talk_${i+1}.png`);
-    const listenImages = Array.from({length: 6}, (_, i) => `bg_listen_${i+1}.png`);
 
-    /* ===================== DOM ===================== */
+    // Replace these with your actual file names
+    const talkImages   = ["bg_talk_1.png","bg_talk_2.png","bg_talk_3.png"];
+    const listenImages = ["bg_listen_2.png","bg_listen_3.png","bg_listen_4.png,"];
+    const ALWAYS_BG    = "background_convo.png";
+
+    /* ====== DOM ====== */
     const bg = document.getElementById("bg");
     const gate = document.getElementById("gate");
     const allowBtn = document.getElementById("allowBtn");
@@ -143,34 +184,29 @@ Contact: support@finetune.audio
     const widgetContainer = document.getElementById("widgetContainer");
     const bgMusic = document.getElementById("bgMusic");
     const nameplate = document.getElementById("nameplate");
-    const warmup = document.getElementById("warmup");
 
     // Privacy dialog
     const privacyDialog = document.getElementById("privacyDialog");
     document.getElementById("openPrivacy").addEventListener("click", () => privacyDialog.showModal());
     document.getElementById("closePrivacy").addEventListener("click", () => privacyDialog.close());
 
-    /* ===================== Preload (non-blocking) ===================== */
-    // Kick off preloads now (we will decode the first critical image later)
-    [...talkImages, ...listenImages, "Background 1.png", ALWAYS_BG].forEach(src => { const i = new Image(); i.src = src; });
+    /* ====== Image Preload for smoother transitions ====== */
+    const preloadList = ["Background 1.png", ALWAYS_BG, ...talkImages, ...listenImages].filter(Boolean);
+    preloadList.forEach(src => { const i = new Image(); i.src = src; });
 
-    /* ===================== Helpers ===================== */
-    function setBackground(img) { if (img) bg.style.backgroundImage = `url('${img}')`; }
-
-    function decodeImage(src) {
-      return new Promise((resolve) => {
-        const im = new Image();
-        im.onload = () => { if (im.decode) im.decode().then(resolve).catch(resolve); else resolve(); };
-        im.onerror = resolve; // on error, still resolve to avoid hanging
-        im.src = src;
-      });
+    /* ====== Background helpers ====== */
+    function setBackground(img) {
+      if (!img) return;
+      bg.style.backgroundImage = `url('${img}')`;
     }
 
-    /* ===================== Widget loader (with fallback) ===================== */
+    /* ====== Widget loader with fallback ====== */
     function injectWidget() {
-      function loadScript(src, cb) {
+      function loadScript(src, onload) {
         const s = document.createElement("script");
-        s.src = src; s.async = true; s.onload = cb; s.onerror = cb; // continue even if primary fails
+        s.src = src; s.async = true;
+        s.onload = onload;
+        s.onerror = () => console.warn("Failed loading", src);
         document.body.appendChild(s);
       }
       if (!customElements.get("elevenlabs-convai")) {
@@ -182,70 +218,90 @@ Contact: support@finetune.audio
       }
       widgetContainer.innerHTML = `<elevenlabs-convai agent-id="${AGENT_ID}" style="--voice-volume:1;"></elevenlabs-convai>`;
       widgetContainer.classList.remove("hidden");
-      attachStateWatcher(widgetContainer.querySelector("elevenlabs-convai"));
+
+      // Ensure static conversation background is applied right away
+      setTimeout(() => setBackground(ALWAYS_BG), 50);
+      setTimeout(() => setBackground(ALWAYS_BG), 400);
+
+      // Start watching the widget for listening/talking states and cycle images
+      const widgetEl = widgetContainer.querySelector("elevenlabs-convai");
+      attachStateWatcher(widgetEl);
     }
 
-    /* ===================== Background cycling ===================== */
+    /* ====== Background cycling by widget state ====== */
     let cycleTimer = null;
     function startCycle(images) {
       stopCycle();
       if (!images || !images.length) return;
-      let idx = 0;
+      let idx = Math.floor(Math.random() * images.length);
       setBackground(images[idx]);
       cycleTimer = setInterval(() => {
         idx = (idx + 1) % images.length;
         setBackground(images[idx]);
       }, 2000);
     }
-    function stopCycle(){ if (cycleTimer){ clearInterval(cycleTimer); cycleTimer = null; } }
+    function stopCycle() {
+      if (cycleTimer) { clearInterval(cycleTimer); cycleTimer = null; }
+    }
 
     function attachStateWatcher(widgetEl) {
-      let state = null;
-      const apply = (s) => {
+      // If we can access shadowRoot, use it; otherwise poll container text as a safe fallback
+      let state = null; // "talk" | "listen" | null
+      const applyState = (s) => {
         if (s === state) return;
         state = s;
-        if (s === "listen") startCycle(listenImages);
-        else if (s === "talk") startCycle(talkImages);
+        if (state === "listen") startCycle(listenImages);
+        else if (state === "talk") startCycle(talkImages);
         else { stopCycle(); setBackground(ALWAYS_BG); }
       };
 
       const tryShadow = () => {
         const root = widgetEl && widgetEl.shadowRoot;
         if (!root) return false;
+
         const observer = new MutationObserver(() => {
           const txt = (root.textContent || "").toLowerCase();
-          if (txt.includes("listening")) apply("listen");
-          else if (txt.includes("talk to interrupt") || txt.includes("interrupt")) apply("talk");
-          else apply(null);
+          if (txt.includes("listening")) applyState("listen");
+          else if (txt.includes("talk to interrupt") || txt.includes("interrupt")) applyState("talk");
+          else applyState(null);
         });
-        observer.observe(root, { subtree:true, childList:true, characterData:true });
-        const init = (root.textContent || "").toLowerCase();
-        if (init.includes("listening")) apply("listen");
-        else if (init.includes("talk to interrupt") || init.includes("interrupt")) apply("talk");
-        else apply(null);
+        observer.observe(root, { subtree: true, childList: true, characterData: true });
+        // Initial read
+        const initialTxt = (root.textContent || "").toLowerCase();
+        if (initialTxt.includes("listening")) applyState("listen");
+        else if (initialTxt.includes("talk to interrupt") || initialTxt.includes("interrupt")) applyState("talk");
+        else applyState(null);
         return true;
       };
 
-      let tries = 0;
+      // Try a few times to access shadowRoot (widget may mount late)
+      let attempts = 0;
       const iv = setInterval(() => {
-        tries++;
-        if (tryShadow()){ clearInterval(iv); return; }
-        if (tries > 40){
+        attempts++;
+        if (tryShadow()) { clearInterval(iv); return; }
+        if (attempts > 40) {
           clearInterval(iv);
+          // Fallback: observe container text
           const observer = new MutationObserver(() => {
-            const txt = (widgetContainer.innerText || "").toLowerCase();
-            if (txt.includes("listening")) apply("listen");
-            else if (txt.includes("talk to interrupt") || txt.includes("interrupt")) apply("talk");
-            else apply(null);
+            const txt = (widgetContainer.innerText || widgetContainer.textContent || "").toLowerCase();
+            if (txt.includes("listening")) applyState("listen");
+            else if (txt.includes("talk to interrupt") || txt.includes("interrupt")) applyState("talk");
+            else applyState(null);
           });
-          observer.observe(widgetContainer, { subtree:true, childList:true, characterData:true });
+          observer.observe(widgetContainer, { subtree: true, childList: true, characterData: true });
+          // Initial
+          const txt = (widgetContainer.innerText || widgetContainer.textContent || "").toLowerCase();
+          if (txt.includes("listening")) applyState("listen");
+          else if (txt.includes("talk to interrupt") || txt.includes("interrupt")) applyState("talk");
+          else applyState(null);
         }
       }, 150);
     }
 
-    /* ===================== AUDIO (fixed 20% via Web Audio) ===================== */
-    bgMusic.muted = true;    // no direct element sound
-    bgMusic.volume = 0;
+    /* ====== AUDIO (Web Audio @ 20% with robust start) ====== */
+    // Direct element output OFF; route via Web Audio @ fixed 0.2
+    bgMusic.muted = true;   // ensure element itself outputs nothing
+    bgMusic.volume = 0;     // belt-and-suspenders for some Android builds
 
     let audioCtx, bgGainNode, mediaElSource, primed = false;
 
@@ -256,72 +312,93 @@ Contact: support@finetune.audio
     }
     function wireGraphOnce() {
       if (!audioCtx) return;
-      if (!bgGainNode) { bgGainNode = audioCtx.createGain(); bgGainNode.gain.value = 0.2; }
+      if (!bgGainNode) {
+        bgGainNode = audioCtx.createGain();
+        bgGainNode.gain.value = 0.2; // FIXED 20%
+      }
       if (!mediaElSource) {
-        try { mediaElSource = audioCtx.createMediaElementSource(bgMusic);
-              mediaElSource.connect(bgGainNode).connect(audioCtx.destination); } catch(_) {}
+        try {
+          mediaElSource = audioCtx.createMediaElementSource(bgMusic);
+          mediaElSource.connect(bgGainNode).connect(audioCtx.destination);
+        } catch(e) {
+          // Safari throws if already connected; safe to ignore
+        }
       }
     }
     async function primeAudio() {
+      // Play muted during gesture to satisfy mobile autoplay policies
       try {
         await createOrResumeCtx();
         wireGraphOnce();
         try { bgMusic.load(); } catch {}
-        await bgMusic.play(); // still muted here
+        await bgMusic.play();
         primed = true;
-      } catch { primed = false; }
+      } catch {
+        primed = false; // Try again on next gesture/click
+      }
     }
     function ensurePlaying() {
-      const nudge = () => bgMusic.play().catch(()=>{});
-      nudge(); [200,600,1200,2500,5000].forEach(t => setTimeout(nudge, t));
+      // Keep nudging play, because some browsers pause after route changes
+      const tryPlay = () => bgMusic.play().catch(()=>{});
+      tryPlay();
+      [120, 400, 900, 1800, 3200, 5000].forEach(t => setTimeout(tryPlay, t));
     }
+
+    // Resume if the tab becomes visible again
     document.addEventListener("visibilitychange", () => {
-      if (document.visibilityState === "visible") createOrResumeCtx().then(() => ensurePlaying());
+      if (document.visibilityState === "visible") {
+        createOrResumeCtx().then(() => ensurePlaying());
+      }
     });
 
-    /* ===================== First-launch SAFE FLOW ===================== */
+    /* ====== Flow ====== */
     async function startExperience() {
-      // Show warm-up shield immediately to avoid any visual jank
-      warmup.classList.add("show");
+      // Mic prompt in the same gesture as starting audio
+      try {
+        await navigator.mediaDevices.getUserMedia({ audio: true });
+      } catch {
+        alert("Microfoontoegang geweigerd. Schakel dit in om de tour te gebruiken.");
+        return;
+      }
 
-      // Request mic inside this gesture (required)
-      try { await navigator.mediaDevices.getUserMedia({ audio: true }); }
-      catch { warmup.classList.remove("show"); alert("Microfoontoegang geweigerd."); return; }
+      // Make sure graph is ready (again) inside the click
+      await createOrResumeCtx();
+      wireGraphOnce();
 
-      // In parallel: decode the first conversation background + prime audio muted
-      const decodeBg = decodeImage(ALWAYS_BG);
-      const prime    = primeAudio();
+      // If we couldn't prime earlier, do it now (still within user gesture)
+      if (!primed) {
+        try {
+          try { bgMusic.load(); } catch {}
+          await bgMusic.play();
+          primed = true;
+        } catch {}
+      }
 
-      // Wait for BG decode OR 1200ms (whichever first) so we never flash black
-      await Promise.race([
-        decodeBg,
-        new Promise(res => setTimeout(res, 1200))
-      ]);
-
-      // Prepare audio graph fully (belt-and-suspenders)
-      await createOrResumeCtx(); wireGraphOnce();
-
-      // Switch UI now that we’re warmed up
+      // Hide gate and switch to conversation background
       gate.classList.add("hidden");
       setBackground(ALWAYS_BG);
+
+      // Fade in the nameplate after 3 seconds
       setTimeout(() => { nameplate.classList.add("visible"); }, 3000);
 
-      // Start/unmute music (keep retrying)
+      // Start/ensure music playback (via Web Audio @ 20%)
       ensurePlaying();
 
-      // Remove warm-up, then mount widget (so script load never blocks the reveal)
-      warmup.classList.remove("show");
+      // Inject ElevenLabs widget (with fallback) and begin background cycling
       injectWidget();
     }
 
-    /* ===================== Event wiring ===================== */
+    /* ====== Events ====== */
     const GESTURE_EVENTS = ["pointerdown","touchstart","mousedown","keydown"];
-    // Pre-prime on earliest gestures for autoplay reliability
-    GESTURE_EVENTS.forEach(ev => allowBtn.addEventListener(ev, primeAudio, { once:false }));
-    // One-time global prime if user taps elsewhere first
-    GESTURE_EVENTS.forEach(ev => document.addEventListener(ev, primeAudio, { once:true, capture:true }));
+    // Prime audio on earliest gestures (most reliable across mobile)
+    GESTURE_EVENTS.forEach(ev => allowBtn.addEventListener(ev, primeAudio, { once: false }));
+    // Global one-time prime if user taps elsewhere first
+    GESTURE_EVENTS.forEach(ev => document.addEventListener(ev, primeAudio, { once: true, capture: true }));
 
+    // Start the experience
     allowBtn.addEventListener("click", startExperience);
+
+    // Deny hides the gate
     denyBtn.addEventListener("click", () => gate.classList.add("hidden"));
   </script>
 </body>
