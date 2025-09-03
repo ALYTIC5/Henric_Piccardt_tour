@@ -166,12 +166,12 @@ Contact: support@finetune.audio
   </dialog>
 
   <div class="widget-container hidden" id="widgetContainer"></div>
-  <audio id="bgMusic" src="BG_Lowest.mp3" loop preload="auto" playsinline webkit-playsinline></audio>
+  <audio id="bgMusic" src="BG_Whisper.mp3" loop preload="auto" playsinline webkit-playsinline></audio>
 
   <script>
     /* ====== CONFIG ====== */
-    const AGENT_ID = "agent_4401k3npmamcf5hawj56bagnz96v"; // Hendric agent
-    const CONVO_BG = "background_convo.png";
+    // Hendric agent (unchanged, just like your current Henric setup)
+    const AGENT_ID = "agent_4401k3npmamcf5hawj56bagnz96v";
 
     /* ====== DOM ====== */
     const bg = document.getElementById("bg");
@@ -187,143 +187,48 @@ Contact: support@finetune.audio
     document.getElementById("openPrivacy").addEventListener("click", () => privacyDialog.showModal());
     document.getElementById("closePrivacy").addEventListener("click", () => privacyDialog.close());
 
-    // Preload convo background for instant swap
-    (new Image()).src = CONVO_BG;
+    /* ====== Helpers ====== */
+    function setBackground(img) {
+      bg.style.backgroundImage = `url('${img}')`;
+    }
 
-    /* ====== AUDIO GRAPH — ALWAYS-START STRATEGY ====== */
-    let audioCtx, bgSource, bgGain;
+    function injectWidget() {
+      // Load the ElevenLabs widget script if not already present
+      if (!document.querySelector('script[src*="elevenlabs.io/convai-widget/index.js"]')) {
+        const s = document.createElement("script");
+        s.src = "https://elevenlabs.io/convai-widget/index.js";
+        s.async = true;
+        s.setAttribute("data-elevenlabs-convai", "true");
+        document.body.appendChild(s);
+      }
+      // Voice volume locked at 100% via CSS var (matches Wadden)
+      widgetContainer.innerHTML = `<elevenlabs-convai agent-id="${AGENT_ID}" style="--voice-volume:1;"></elevenlabs-convai>`;
+      widgetContainer.classList.remove("hidden");
+      // Reassert convo background once widget mounts (extra reliability)
+      setTimeout(() => setBackground("background_convo.png"), 200);
+      setTimeout(() => setBackground("background_convo.png"), 1000);
+    }
 
+    // Background music setup — constant 20%, no fades
+    let audioCtx, bgGainNode;
     function setupAudio() {
       if (!audioCtx) {
         audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-
-        bgSource = audioCtx.createMediaElementSource(bgMusic);
-        bgGain   = audioCtx.createGain();
-        bgGain.gain.value = 0.20; // constant 20%
-
-        bgSource.connect(bgGain).connect(audioCtx.destination);
-
-        // Ensure only Web Audio path is audible
-        bgMusic.muted  = true;
-        bgMusic.volume = 1.0;
-
-        document.addEventListener("visibilitychange", () => {
-          if (document.visibilityState === "visible" && audioCtx.state === "suspended") {
-            audioCtx.resume().catch(()=>{});
-          }
-        });
-        window.addEventListener("pageshow", () => {
-          if (audioCtx.state === "suspended") {
-            audioCtx.resume().catch(()=>{});
-          }
-          nudgePlay();
-        });
-        window.addEventListener("focus", nudgePlay);
+        bgGainNode = audioCtx.createGain();
+        bgGainNode.gain.value = 0.2; // 20%
+        const src = audioCtx.createMediaElementSource(bgMusic);
+        src.connect(bgGainNode).connect(audioCtx.destination);
       }
-
-      if (audioCtx.state === "suspended") {
-        audioCtx.resume().catch(()=>{});
-      }
+      if (audioCtx.state === "suspended") audioCtx.resume().catch(()=>{});
     }
 
-    function nudgePlay() {
-      [0, 120, 240, 480, 960, 1440].forEach(ms => {
-        setTimeout(() => { if (bgMusic.paused) bgMusic.play().catch(()=>{}); }, ms);
-      });
-      [2000, 3000, 4500, 6000, 8000].forEach(ms => {
-        setTimeout(() => { if (bgMusic.paused) bgMusic.play().catch(()=>{}); }, ms);
-      });
-      const start = performance.now();
-      function rafKick(t) {
-        if (!bgMusic.paused) return;
-        bgMusic.play().catch(()=>{});
-        if (t - start < 2000) requestAnimationFrame(rafKick);
-      }
-      requestAnimationFrame(rafKick);
-    }
-
-    function startBed() {
-      try { bgMusic.currentTime = 0; } catch(e) {}
-      bgMusic.play().catch(()=>{});
-      nudgePlay();
-      bgMusic.addEventListener("pause", () => {
-        if (document.visibilityState !== "visible") return;
-        bgMusic.play().catch(()=>{});
-        nudgePlay();
+    function ensureBedStaysAlive() {
+      // Some browsers pause when the widget initializes; poke it back a few times
+      [150, 600, 1200, 2500].forEach(t => {
+        setTimeout(() => { if (bgMusic.paused) bgMusic.play().catch(()=>{}); }, t);
       });
     }
 
-    /* ====== ELEVENLABS WIDGET (AI @100%) ======
-       Robust loader: try unpkg first, then ElevenLabs CDN.
-    ================================================= */
-    const WIDGET_PRIMARY = 'https://unpkg.com/@elevenlabs/convai-widget-embed';
-    const WIDGET_FALLBACK = 'https://elevenlabs.io/convai-widget/index.js';
-
-    function ensureScript(src, attrs = {}) {
-      return new Promise((resolve, reject) => {
-        const existing = document.querySelector(`script[src="${src}"]`);
-        if (existing && existing.dataset._loaded === "1") {
-          resolve();
-          return;
-        }
-        const s = existing || document.createElement('script');
-        s.src = src;
-        s.async = true;
-        Object.entries(attrs).forEach(([k,v]) => s.setAttribute(k, v));
-        s.onload = () => { s.dataset._loaded = "1"; resolve(); };
-        s.onerror = reject;
-        if (!existing) document.head.appendChild(s);
-      });
-    }
-
-    function waitForElementDefined(name, timeoutMs = 3000) {
-      if (customElements.get(name)) return Promise.resolve();
-      return new Promise((resolve, reject) => {
-        let done = false;
-        const to = setTimeout(() => {
-          if (!done) { done = true; reject(new Error('timeout')); }
-        }, timeoutMs);
-        customElements.whenDefined(name).then(() => {
-          if (!done) { done = true; clearTimeout(to); resolve(); }
-        }).catch(err => {
-          if (!done) { done = true; clearTimeout(to); reject(err); }
-        });
-      });
-    }
-
-    async function injectWidget() {
-      // Try primary
-      let defined = false;
-      try {
-        await ensureScript(WIDGET_PRIMARY);
-        await waitForElementDefined('elevenlabs-convai', 2500);
-        defined = true;
-      } catch(_) {}
-
-      // Fallback if not defined
-      if (!defined) {
-        try {
-          await ensureScript(WIDGET_FALLBACK, { 'data-elevenlabs-convai': 'true' });
-          await waitForElementDefined('elevenlabs-convai', 4000);
-          defined = true;
-        } catch (e) {
-          console.warn('ElevenLabs widget failed to load from both sources.', e);
-        }
-      }
-
-      // Insert widget either way; if defined it will upgrade immediately when ready
-      widgetContainer.innerHTML =
-        `<elevenlabs-convai agent-id="${AGENT_ID}" style="--voice-volume:1;"></elevenlabs-convai>`;
-      widgetContainer.classList.remove("hidden");
-
-      // Extra background reassert + audio nudges
-      setTimeout(() => bg.style.backgroundImage = `url('${CONVO_BG}')`, 150);
-      setTimeout(() => bg.style.backgroundImage = `url('${CONVO_BG}')`, 600);
-      setTimeout(nudgePlay, 300);
-      setTimeout(nudgePlay, 1200);
-    }
-
-    /* ====== PERMISSION FLOW ====== */
     async function startExperience() {
       try {
         await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -332,20 +237,30 @@ Contact: support@finetune.audio
         return;
       }
 
+      // Hide gate and immediately switch to conversation background (single image)
       gate.classList.add("hidden");
-      bg.style.backgroundImage = `url('${CONVO_BG}')`;
-      setTimeout(() => bg.style.backgroundImage = `url('${CONVO_BG}')`, 50);
+      setBackground("background_convo.png");
+      // Reassert once more shortly after to avoid any race with layout/paint
+      setTimeout(() => setBackground("background_convo.png"), 50);
 
+      // Optional nameplate appearance
       setTimeout(() => { nameplate.classList.add("visible"); }, 3000);
 
+      // Audio: start bed at constant 20%
       setupAudio();
-      startBed();
+      bgMusic.play().catch(()=>{});
+      ensureBedStaysAlive();
 
+      // Inject the widget (AI at 100%)
       injectWidget();
+      ensureBedStaysAlive();
     }
 
-    allowBtn.addEventListener("click", startExperience, { once: true });
+    allowBtn.addEventListener("click", startExperience);
     denyBtn.addEventListener("click", () => gate.classList.add("hidden"));
+
+    // Preload the convo background for snappy switch
+    (new Image()).src = "background_convo.png";
   </script>
 </body>
 </html>
