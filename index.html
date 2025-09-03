@@ -15,31 +15,28 @@
       background: #000;
     }
 
-    /* Background layer (unchanged position) */
     #bg {
       position: fixed;
       inset: 0;
       background: center center / cover no-repeat;
     }
 
-    /* Nameplate: top-center, same physical location, size between too small (40%) and too big (70%) */
     #nameplate {
       position: fixed;
-      top: 0;                       /* very top */
+      top: 0;
       left: 50%;
-      transform: translateX(-50%);  /* centered horizontally */
-      max-width: 55%;               /* BETWEEN 40% and 70% */
+      transform: translateX(-50%);
+      max-width: 55%;
       height: auto;
       z-index: 15;
       pointer-events: none;
-      opacity: 0;                   /* fade-in after permission */
+      opacity: 0;
       transition: opacity 1.2s ease-in;
     }
     #nameplate.visible { opacity: 1; }
 
     .hidden { display: none !important; }
 
-    /* Permission gate */
     .gate {
       position: fixed;
       inset: 0;
@@ -92,7 +89,6 @@
       height: 140px;
     }
 
-    /* Privacy dialog */
     dialog.privacy {
       width: min(92vw, 560px);
       border: none;
@@ -163,20 +159,15 @@ Contact: support@finetune.audio
 
   <div class="widget-container hidden" id="widgetContainer"></div>
 
-  <!-- Background music: set to the attached BG_Lower.mp3.
-       Direct element output is muted; audio is routed via Web Audio at fixed 0.2 gain. -->
+  <!-- Background music -->
   <audio id="bgMusic" src="BG_Lower.mp3" loop preload="auto" playsinline webkit-playsinline></audio>
 
   <script>
-    /* ====== CONFIG ====== */
     const AGENT_ID = "agent_4401k3npmamcf5hawj56bagnz96v";
-
-    // Replace these with your actual file names
-    const talkImages   = ["bg_talk_1.png","bg_talk_2.png","bg_talk_3.png"];
-    const listenImages = ["bg_listen_2.png","bg_listen_3.png","bg_listen_4.png"];
+    const talkImages   = Array.from({length: 9}, (_, i) => `bg_talk_${i+1}.png`);
+    const listenImages = Array.from({length: 6}, (_, i) => `bg_listen_${i+1}.png`);
     const ALWAYS_BG    = "background_convo.png";
 
-    /* ====== DOM ====== */
     const bg = document.getElementById("bg");
     const gate = document.getElementById("gate");
     const allowBtn = document.getElementById("allowBtn");
@@ -185,80 +176,58 @@ Contact: support@finetune.audio
     const bgMusic = document.getElementById("bgMusic");
     const nameplate = document.getElementById("nameplate");
 
-    // Privacy dialog
     const privacyDialog = document.getElementById("privacyDialog");
     document.getElementById("openPrivacy").addEventListener("click", () => privacyDialog.showModal());
     document.getElementById("closePrivacy").addEventListener("click", () => privacyDialog.close());
 
-    /* ====== Image Preload for smoother transitions ====== */
-    const preloadList = ["Background 1.png", ALWAYS_BG, ...talkImages, ...listenImages].filter(Boolean);
-    preloadList.forEach(src => { const i = new Image(); i.src = src; });
+    // Preload
+    [...talkImages, ...listenImages, "Background 1.png", ALWAYS_BG].forEach(src => { const i = new Image(); i.src = src; });
 
-    /* ====== Background helpers ====== */
-    function setBackground(img) {
-      if (!img) return;
-      bg.style.backgroundImage = `url('${img}')`;
-    }
+    function setBackground(img) { if (img) bg.style.backgroundImage = `url('${img}')`; }
 
-    /* ====== Widget loader with fallback ====== */
     function injectWidget() {
       function loadScript(src, onload) {
         const s = document.createElement("script");
-        s.src = src; s.async = true;
-        s.onload = onload;
-        s.onerror = () => console.warn("Failed loading", src);
+        s.src = src; s.async = true; s.onload = onload;
         document.body.appendChild(s);
       }
       if (!customElements.get("elevenlabs-convai")) {
         loadScript("https://elevenlabs.io/convai-widget/index.js", () => {
           if (!customElements.get("elevenlabs-convai")) {
-            loadScript("https://unpkg.com/@elevenlabs/convai-widget-embed", () => {});
+            loadScript("https://unpkg.com/@elevenlabs/convai-widget-embed");
           }
         });
       }
       widgetContainer.innerHTML = `<elevenlabs-convai agent-id="${AGENT_ID}" style="--voice-volume:1;"></elevenlabs-convai>`;
       widgetContainer.classList.remove("hidden");
-
-      // Ensure static conversation background is applied right away
-      setTimeout(() => setBackground(ALWAYS_BG), 50);
-      setTimeout(() => setBackground(ALWAYS_BG), 400);
-
-      // Start watching the widget for listening/talking states and cycle images
-      const widgetEl = widgetContainer.querySelector("elevenlabs-convai");
-      attachStateWatcher(widgetEl);
+      attachStateWatcher(widgetContainer.querySelector("elevenlabs-convai"));
     }
 
-    /* ====== Background cycling by widget state ====== */
     let cycleTimer = null;
     function startCycle(images) {
       stopCycle();
       if (!images || !images.length) return;
-      let idx = Math.floor(Math.random() * images.length);
+      let idx = 0;
       setBackground(images[idx]);
       cycleTimer = setInterval(() => {
         idx = (idx + 1) % images.length;
         setBackground(images[idx]);
       }, 2000);
     }
-    function stopCycle() {
-      if (cycleTimer) { clearInterval(cycleTimer); cycleTimer = null; }
-    }
+    function stopCycle() { if (cycleTimer) { clearInterval(cycleTimer); cycleTimer = null; } }
 
     function attachStateWatcher(widgetEl) {
-      // If we can access shadowRoot, use it; otherwise poll container text as a safe fallback
-      let state = null; // "talk" | "listen" | null
+      let state = null;
       const applyState = (s) => {
         if (s === state) return;
         state = s;
-        if (state === "listen") startCycle(listenImages);
-        else if (state === "talk") startCycle(talkImages);
+        if (s === "listen") startCycle(listenImages);
+        else if (s === "talk") startCycle(talkImages);
         else { stopCycle(); setBackground(ALWAYS_BG); }
       };
-
       const tryShadow = () => {
         const root = widgetEl && widgetEl.shadowRoot;
         if (!root) return false;
-
         const observer = new MutationObserver(() => {
           const txt = (root.textContent || "").toLowerCase();
           if (txt.includes("listening")) applyState("listen");
@@ -266,139 +235,81 @@ Contact: support@finetune.audio
           else applyState(null);
         });
         observer.observe(root, { subtree: true, childList: true, characterData: true });
-        // Initial read
         const initialTxt = (root.textContent || "").toLowerCase();
         if (initialTxt.includes("listening")) applyState("listen");
         else if (initialTxt.includes("talk to interrupt") || initialTxt.includes("interrupt")) applyState("talk");
         else applyState(null);
         return true;
       };
-
-      // Try a few times to access shadowRoot (widget may mount late)
       let attempts = 0;
       const iv = setInterval(() => {
         attempts++;
         if (tryShadow()) { clearInterval(iv); return; }
         if (attempts > 40) {
           clearInterval(iv);
-          // Fallback: observe container text
           const observer = new MutationObserver(() => {
-            const txt = (widgetContainer.innerText || widgetContainer.textContent || "").toLowerCase();
+            const txt = (widgetContainer.innerText || "").toLowerCase();
             if (txt.includes("listening")) applyState("listen");
             else if (txt.includes("talk to interrupt") || txt.includes("interrupt")) applyState("talk");
             else applyState(null);
           });
           observer.observe(widgetContainer, { subtree: true, childList: true, characterData: true });
-          // Initial
-          const txt = (widgetContainer.innerText || widgetContainer.textContent || "").toLowerCase();
-          if (txt.includes("listening")) applyState("listen");
-          else if (txt.includes("talk to interrupt") || txt.includes("interrupt")) applyState("talk");
-          else applyState(null);
         }
       }, 150);
     }
 
-    /* ====== AUDIO (Web Audio @ 20% with robust start) ====== */
-    // Direct element output OFF; route via Web Audio @ fixed 0.2
-    bgMusic.muted = true;   // ensure element itself outputs nothing
-    bgMusic.volume = 0;     // belt-and-suspenders for some Android builds
-
+    // ====== AUDIO ======
+    bgMusic.muted = true; bgMusic.volume = 0;
     let audioCtx, bgGainNode, mediaElSource, primed = false;
-
     function createOrResumeCtx() {
       if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
       if (audioCtx.state === "suspended") return audioCtx.resume().catch(()=>{});
       return Promise.resolve();
     }
     function wireGraphOnce() {
-      if (!audioCtx) return;
       if (!bgGainNode) {
         bgGainNode = audioCtx.createGain();
-        bgGainNode.gain.value = 0.2; // FIXED 20%
+        bgGainNode.gain.value = 0.2;
       }
       if (!mediaElSource) {
         try {
           mediaElSource = audioCtx.createMediaElementSource(bgMusic);
           mediaElSource.connect(bgGainNode).connect(audioCtx.destination);
-        } catch(e) {
-          // Safari throws if already connected; safe to ignore
-        }
+        } catch(e) {}
       }
     }
     async function primeAudio() {
-      // Play muted during gesture to satisfy mobile autoplay policies
       try {
-        await createOrResumeCtx();
-        wireGraphOnce();
+        await createOrResumeCtx(); wireGraphOnce();
         try { bgMusic.load(); } catch {}
-        await bgMusic.play();
-        primed = true;
-      } catch {
-        primed = false; // Try again on next gesture/click
-      }
+        await bgMusic.play(); primed = true;
+      } catch { primed = false; }
     }
     function ensurePlaying() {
-      // Keep nudging play, because some browsers pause after route changes
       const tryPlay = () => bgMusic.play().catch(()=>{});
       tryPlay();
-      [120, 400, 900, 1800, 3200, 5000].forEach(t => setTimeout(tryPlay, t));
+      [200,600,1200,2500,5000].forEach(t => setTimeout(tryPlay, t));
     }
-
-    // Resume if the tab becomes visible again
     document.addEventListener("visibilitychange", () => {
-      if (document.visibilityState === "visible") {
-        createOrResumeCtx().then(() => ensurePlaying());
-      }
+      if (document.visibilityState === "visible") createOrResumeCtx().then(() => ensurePlaying());
     });
 
-    /* ====== Flow ====== */
     async function startExperience() {
-      // Mic prompt in the same gesture as starting audio
-      try {
-        await navigator.mediaDevices.getUserMedia({ audio: true });
-      } catch {
-        alert("Microfoontoegang geweigerd. Schakel dit in om de tour te gebruiken.");
-        return;
-      }
-
-      // Make sure graph is ready (again) inside the click
-      await createOrResumeCtx();
-      wireGraphOnce();
-
-      // If we couldn't prime earlier, do it now (still within user gesture)
-      if (!primed) {
-        try {
-          try { bgMusic.load(); } catch {}
-          await bgMusic.play();
-          primed = true;
-        } catch {}
-      }
-
-      // Hide gate and switch to conversation background
+      try { await navigator.mediaDevices.getUserMedia({ audio: true }); }
+      catch { alert("Microfoontoegang geweigerd."); return; }
+      await createOrResumeCtx(); wireGraphOnce();
+      if (!primed) { try { await bgMusic.play(); primed = true; } catch {} }
       gate.classList.add("hidden");
       setBackground(ALWAYS_BG);
-
-      // Fade in the nameplate after 3 seconds
       setTimeout(() => { nameplate.classList.add("visible"); }, 3000);
-
-      // Start/ensure music playback (via Web Audio @ 20%)
       ensurePlaying();
-
-      // Inject ElevenLabs widget (with fallback) and begin background cycling
       injectWidget();
     }
 
-    /* ====== Events ====== */
     const GESTURE_EVENTS = ["pointerdown","touchstart","mousedown","keydown"];
-    // Prime audio on earliest gestures (most reliable across mobile)
     GESTURE_EVENTS.forEach(ev => allowBtn.addEventListener(ev, primeAudio, { once: false }));
-    // Global one-time prime if user taps elsewhere first
     GESTURE_EVENTS.forEach(ev => document.addEventListener(ev, primeAudio, { once: true, capture: true }));
-
-    // Start the experience
     allowBtn.addEventListener("click", startExperience);
-
-    // Deny hides the gate
     denyBtn.addEventListener("click", () => gate.classList.add("hidden"));
   </script>
 </body>
