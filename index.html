@@ -26,15 +26,6 @@
 
     .widget-container { position: fixed; bottom: 10px; left: 50%; transform: translateX(-50%); width: 92%; max-width: 480px; z-index: 10; }
     .widget-container > elevenlabs-convai, .widget-container iframe { width: 100%; height: 140px; }
-
-    #musicControls {
-      position: fixed; top: 10px; left: 50%; transform: translateX(-50%);
-      background: rgba(255,255,255,0.8); padding: 6px 10px; border-radius: 10px;
-      display: flex; gap: 6px; z-index: 30;
-    }
-    #musicControls button {
-      padding: 6px 10px; font-size: 0.85rem; cursor: pointer; border-radius: 6px; border: 1px solid #888;
-    }
   </style>
 </head>
 <body>
@@ -55,18 +46,8 @@
   <!-- ElevenLabs widget -->
   <div class="widget-container hidden" id="widgetContainer"></div>
 
-  <!-- Background Music -->
-  <audio id="bgMusic" src="Background Music.mp3" loop preload="auto" playsinline webkit-playsinline></audio>
-
-  <!-- Music swap controls -->
-  <div id="musicControls" class="hidden">
-    <button data-src="Background Music.mp3">Default</button>
-    <button data-src="BG_Low.mp3">Low</button>
-    <button data-src="BG_Lower.mp3">Lower</button>
-    <button data-src="BG_Lowered_50.mp3">50%</button>
-    <button data-src="BG_Lowest.mp3">Lowest</button>
-    <button data-src="BG_Whisper.mp3">Whisper</button>
-  </div>
+  <!-- Background Music (permanently Whisper) -->
+  <audio id="bgMusic" src="BG_Whisper.mp3" loop preload="auto" playsinline webkit-playsinline></audio>
 
   <script>
     const AGENT_ID = "agent_4401k3npmamcf5hawj56bagnz96v";
@@ -76,7 +57,6 @@
     const denyBtn = document.getElementById("denyBtn");
     const widgetContainer = document.getElementById("widgetContainer");
     const bgMusic = document.getElementById("bgMusic");
-    const musicControls = document.getElementById("musicControls");
 
     let audioCtx, bgGainNode, mediaElSource, primed = false;
 
@@ -144,7 +124,6 @@
       bg.style.backgroundImage = "url('background_convo.png')";
       unmuteAndPlay();
       injectWidget();
-      musicControls.classList.remove("hidden");
     }
 
     // Event wiring
@@ -157,16 +136,6 @@
       document.addEventListener(ev, primeAudio, { once: true, capture: true });
     });
 
-    // Music swap buttons
-    musicControls.querySelectorAll("button").forEach(btn => {
-      btn.addEventListener("click", () => {
-        bgMusic.src = btn.dataset.src;
-        bgMusic.load();
-        unmuteAndPlay();
-      });
-    });
-
-    // Resume if tab was backgrounded
     document.addEventListener("visibilitychange", () => {
       if (document.visibilityState === "visible") {
         createOrResumeCtx().then(() => unmuteAndPlay());
