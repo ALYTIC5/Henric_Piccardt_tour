@@ -166,12 +166,12 @@ Contact: support@finetune.audio
   </dialog>
 
   <div class="widget-container hidden" id="widgetContainer"></div>
-  <audio id="bgMusic" src="BG_Lowered.mp3" loop preload="auto" playsinline webkit-playsinline></audio>
+  <audio id="bgMusic" src="Background Music.mp3" loop preload="auto" playsinline webkit-playsinline></audio>
 
   <script>
     /* ====== CONFIG ====== */
-    // Hendric agent (unchanged, just like your current Henric setup)
-    const AGENT_ID = "agent_4401k3npmamcf5hawj56bagnz96v";
+    const AGENT_ID = "agent_4401k3npmamcf5hawj56bagnz96v"; // Hendric agent
+    const CONVO_BG = "background_convo.png";
 
     /* ====== DOM ====== */
     const bg = document.getElementById("bg");
@@ -187,80 +187,142 @@ Contact: support@finetune.audio
     document.getElementById("openPrivacy").addEventListener("click", () => privacyDialog.showModal());
     document.getElementById("closePrivacy").addEventListener("click", () => privacyDialog.close());
 
-    /* ====== Helpers ====== */
-    function setBackground(img) {
-      bg.style.backgroundImage = `url('${img}')`;
-    }
+    // Preload convo background for instant swap
+    (new Image()).src = CONVO_BG;
 
-    function injectWidget() {
-      // Load the ElevenLabs widget script if not already present
-      if (!document.querySelector('script[src*="elevenlabs.io/convai-widget/index.js"]')) {
-        const s = document.createElement("script");
-        s.src = "https://elevenlabs.io/convai-widget/index.js";
-        s.async = true;
-        s.setAttribute("data-elevenlabs-convai", "true");
-        document.body.appendChild(s);
-      }
-      // Voice volume locked at 100% via CSS var (matches Wadden)
-      widgetContainer.innerHTML = `<elevenlabs-convai agent-id="${AGENT_ID}" style="--voice-volume:1;"></elevenlabs-convai>`;
-      widgetContainer.classList.remove("hidden");
-      // Reassert convo background once widget mounts (extra reliability)
-      setTimeout(() => setBackground("background_convo.png"), 200);
-      setTimeout(() => setBackground("background_convo.png"), 1000);
-    }
+    /* ====== AUDIO GRAPH — ALWAYS-START STRATEGY ======
+       - Web Audio only path: mute the element's default sink.
+       - Gain at 0.2 guarantees bed is 20% of full-scale.
+       - Aggressive re-tries + lifecycle hooks keep it alive.
+    =================================================== */
+    let audioCtx, bgSource, bgGain;
 
-    // Background music setup — constant 20%, no fades
-    let audioCtx, bgGainNode;
     function setupAudio() {
       if (!audioCtx) {
         audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        bgGainNode = audioCtx.createGain();
-        bgGainNode.gain.value = 0.2; // 20%
-        const src = audioCtx.createMediaElementSource(bgMusic);
-        src.connect(bgGainNode).connect(audioCtx.destination);
+
+        // Build graph
+        bgSource = audioCtx.createMediaElementSource(bgMusic);
+        bgGain   = audioCtx.createGain();
+        bgGain.gain.value = 0.20; // constant 20%
+
+        bgSource.connect(bgGain).connect(audioCtx.destination);
+
+        // Ensure only Web Audio path is audible
+        bgMusic.muted  = true;
+        bgMusic.volume = 1.0;
+
+        // Resume context when tab regains focus (iOS/Safari)
+        document.addEventListener("visibilitychange", () => {
+          if (document.visibilityState === "visible" && audioCtx.state === "suspended") {
+            audioCtx.resume().catch(()=>{});
+          }
+        });
+        window.addEventListener("pageshow", () => {
+          if (audioCtx.state === "suspended") {
+            audioCtx.resume().catch(()=>{});
+          }
+          nudgePlay();
+        });
+        window.addEventListener("focus", nudgePlay);
       }
-      if (audioCtx.state === "suspended") audioCtx.resume().catch(()=>{});
+
+      if (audioCtx.state === "suspended") {
+        audioCtx.resume().catch(()=>{});
+      }
     }
 
-    function ensureBedStaysAlive() {
-      // Some browsers pause when the widget initializes; poke it back a few times
-      [150, 600, 1200, 2500].forEach(t => {
-        setTimeout(() => { if (bgMusic.paused) bgMusic.play().catch(()=>{}); }, t);
+    // Multiple layers of retries to defeat autoplay/WebRTC pauses
+    function nudgePlay() {
+      // Quick-fire nudges (first ~1.5s)
+      [0, 120, 240, 480, 960, 1440].forEach(ms => {
+        setTimeout(() => {
+          if (bgMusic.paused) bgMusic.play().catch(()=>{});
+        }, ms);
+      });
+
+      // Short backoff series (up to ~8s)
+      [2000, 3000, 4500, 6000, 8000].forEach(ms => {
+        setTimeout(() => {
+          if (bgMusic.paused) bgMusic.play().catch(()=>{});
+        }, ms);
+      });
+
+      // RAF pinger for the first 2 seconds (catches very brief interruptions)
+      const start = performance.now();
+      function rafKick(t) {
+        if (!bgMusic.paused) return;
+        bgMusic.play().catch(()=>{});
+        if (t - start < 2000) requestAnimationFrame(rafKick);
+      }
+      requestAnimationFrame(rafKick);
+    }
+
+    function startBed() {
+      // Reset to start and begin
+      try { bgMusic.currentTime = 0; } catch(e) {}
+      bgMusic.play().catch(()=>{});
+      nudgePlay();
+
+      // If the element ever gets paused unexpectedly, bring it back
+      bgMusic.addEventListener("pause", () => {
+        // Ignore if the page is hidden (we'll resume on pageshow/visibilitychange)
+        if (document.visibilityState !== "visible") return;
+        bgMusic.play().catch(()=>{});
+        nudgePlay();
       });
     }
 
+    /* ====== ELEVENLABS WIDGET (AI @100%) ====== */
+    function injectWidget() {
+      if (!document.querySelector('script[src*="@elevenlabs/convai-widget-embed"]')) {
+        const s = document.createElement("script");
+        s.src = "https://unpkg.com/@elevenlabs/convai-widget-embed";
+        s.async = true;
+        document.head.appendChild(s);
+      }
+      widgetContainer.innerHTML =
+        `<elevenlabs-convai agent-id="${AGENT_ID}" style="--voice-volume:1;"></elevenlabs-convai>`;
+      widgetContainer.classList.remove("hidden");
+
+      // Extra background reassert (rare race when iframe mounts)
+      setTimeout(() => bg.style.backgroundImage = `url('${CONVO_BG}')`, 150);
+      setTimeout(() => bg.style.backgroundImage = `url('${CONVO_BG}')`, 600);
+
+      // Widget initialization can sometimes bump audio — nudge again
+      setTimeout(nudgePlay, 300);
+      setTimeout(nudgePlay, 1200);
+    }
+
+    /* ====== PERMISSION FLOW ====== */
     async function startExperience() {
       try {
+        // Request mic; keep it simple (disabling processing is fine, but not required for starting bed)
         await navigator.mediaDevices.getUserMedia({ audio: true });
       } catch {
         alert("Microfoontoegang geweigerd. Schakel dit in om de tour te gebruiken.");
         return;
       }
 
-      // Hide gate and immediately switch to conversation background (single image)
+      // Hide gate and switch immediately to the conversation background (single image)
       gate.classList.add("hidden");
-      setBackground("background_convo.png");
-      // Reassert once more shortly after to avoid any race with layout/paint
-      setTimeout(() => setBackground("background_convo.png"), 50);
+      bg.style.backgroundImage = `url('${CONVO_BG}')`;
+      // Reassert shortly after to avoid any race with layout/paint
+      setTimeout(() => bg.style.backgroundImage = `url('${CONVO_BG}')`, 50);
 
       // Optional nameplate appearance
       setTimeout(() => { nameplate.classList.add("visible"); }, 3000);
 
-      // Audio: start bed at constant 20%
+      // Audio: set up graph and start bed at constant 20%
       setupAudio();
-      bgMusic.play().catch(()=>{});
-      ensureBedStaysAlive();
+      startBed();
 
       // Inject the widget (AI at 100%)
       injectWidget();
-      ensureBedStaysAlive();
     }
 
-    allowBtn.addEventListener("click", startExperience);
+    allowBtn.addEventListener("click", startExperience, { once: true });
     denyBtn.addEventListener("click", () => gate.classList.add("hidden"));
-
-    // Preload the convo background for snappy switch
-    (new Image()).src = "background_convo.png";
   </script>
 </body>
 </html>
