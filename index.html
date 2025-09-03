@@ -9,120 +9,38 @@
   <title>Henric Piccardt Tour</title>
   <meta name="theme-color" content="#1d1d1b" />
   <style>
-    html, body {
-      height: 100%;
-      margin: 0;
-      padding: 0;
-      overflow: hidden;
-      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-      background: #000;
-    }
-
-    /* Background layer (fixed) */
-    #bg {
-      position: fixed;
-      inset: 0;
-      background: center center / cover no-repeat;
-    }
-
-    /* Nameplate (optional) */
-    #nameplate {
-      position: fixed;
-      top: 0;
-      left: 50%;
-      transform: translateX(-50%);
-      max-width: 55%;
-      height: auto;
-      z-index: 15;
-      pointer-events: none;
-      opacity: 0;
-      transition: opacity 1.2s ease-in;
-    }
+    html, body { height: 100%; margin: 0; padding: 0; overflow: hidden; font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; background: #000; }
+    #bg { position: fixed; inset: 0; background: center center / cover no-repeat; }
+    #nameplate { position: fixed; top: 0; left: 50%; transform: translateX(-50%); max-width: 55%; height: auto; z-index: 15; pointer-events: none; opacity: 0; transition: opacity 1.2s ease-in; }
     #nameplate.visible { opacity: 1; }
-
     .hidden { display: none !important; }
 
-    /* Permission gate (original) */
-    .gate {
-      position: fixed;
-      inset: 0;
-      display: flex;
-      justify-content: center;
-      align-items: flex-end;
-      padding-bottom: 18%;
-      z-index: 20;
-      background: rgba(0,0,0,0.05);
-    }
-    .card {
-      width: min(90vw, 420px);
-      border-radius: 18px;
-      background: rgba(255,255,255,0.85);
-      backdrop-filter: blur(4px);
-      -webkit-backdrop-filter: blur(4px);
-      box-shadow: 0 12px 40px rgba(0,0,0,.25);
-      padding: 18px;
-      text-align: center;
-    }
+    /* Permission gate */
+    .gate { position: fixed; inset: 0; display: flex; justify-content: center; align-items: flex-end; padding-bottom: 18%; z-index: 20; background: rgba(0,0,0,0.05); }
+    .card { width: min(90vw, 420px); border-radius: 18px; background: rgba(255,255,255,0.85); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); box-shadow: 0 12px 40px rgba(0,0,0,.25); padding: 18px; text-align: center; }
     .card h1 { font-size: 1.1rem; margin: 6px 0 10px; }
     .card p { font-size: .95rem; margin: 0 10px 12px; }
     .row { display: flex; gap: 10px; }
-    .btn {
-      flex: 1 1 auto;
-      padding: 12px 14px;
-      border-radius: 12px;
-      border: 2px solid transparent;
-      font-weight: 600;
-      cursor: pointer;
-    }
+    .btn { flex: 1 1 auto; padding: 12px 14px; border-radius: 12px; border: 2px solid transparent; font-weight: 600; cursor: pointer; }
     .btn-allow { background: #0b6efd; color: #fff; }
     .btn-deny { background: #eee; color: #111; }
 
     .small { font-size: 0.86rem; color: #333; margin-top: 8px; }
     .link { color: #0b6efd; text-decoration: underline; cursor: pointer; font-weight: 600; }
 
-    .widget-container {
-      position: fixed;
-      bottom: 10px;
-      left: 50%;
-      transform: translateX(-50%);
-      width: 92%;
-      max-width: 480px;
-      z-index: 10;
-    }
-    .widget-container > elevenlabs-convai,
-    .widget-container iframe {
-      width: 100%;
-      height: 140px;
-    }
+    .widget-container { position: fixed; bottom: 10px; left: 50%; transform: translateX(-50%); width: 92%; max-width: 480px; z-index: 10; }
+    .widget-container > elevenlabs-convai, .widget-container iframe { width: 100%; height: 140px; }
 
-    /* Privacy dialog (unchanged) */
-    dialog.privacy {
-      width: min(92vw, 560px);
-      border: none;
-      border-radius: 16px;
-      box-shadow: 0 20px 60px rgba(0,0,0,.35);
-      padding: 0;
-      max-height: 80vh;
-    }
+    dialog.privacy { width: min(92vw, 560px); border: none; border-radius: 16px; box-shadow: 0 20px 60px rgba(0,0,0,.35); padding: 0; max-height: 80vh; }
     dialog::backdrop { background: rgba(0,0,0,0.45); }
     .dialog-body { padding: 18px 18px 6px; }
-    .dialog-header {
-      display:flex; align-items:center; justify-content:space-between;
-      padding: 14px 16px; border-bottom: 1px solid #eee;
-    }
+    .dialog-header { display:flex; align-items:center; justify-content:space-between; padding: 14px 16px; border-bottom: 1px solid #eee; }
     .dialog-title { margin:0; font-size: 1rem; font-weight: 800; }
-    .dialog-close {
-      border:none; background:#eee; color:#111; font-weight:700;
-      padding:8px 12px; border-radius:10px; cursor:pointer;
-    }
-    .dialog-content {
-      padding: 0 16px 16px;
-      font-size: .95rem; line-height: 1.45; white-space: pre-wrap;
-    }
+    .dialog-close { border:none; background:#eee; color:#111; font-weight:700; padding:8px 12px; border-radius:10px; cursor:pointer; }
+    .dialog-content { padding: 0 16px 16px; font-size: .95rem; line-height: 1.45; white-space: pre-wrap; }
   </style>
 </head>
 <body>
-  <!-- Start with the original permission background -->
   <div id="bg" style="background-image:url('Background 1.png')"></div>
   <img id="nameplate" src="name-removebg.png" alt="Henric Piccardt" />
 
@@ -134,10 +52,7 @@
         <button class="btn btn-deny" id="denyBtn">Niet nu</button>
         <button class="btn btn-allow" id="allowBtn">Toestaan</button>
       </div>
-      <p class="small">
-        🌐 Uitgebreider privacy statement
-        (<span id="openPrivacy" class="link" role="button" tabindex="0" aria-controls="privacyDialog">lees meer</span>)
-      </p>
+      <p class="small">🌐 Uitgebreider privacy statement (<span id="openPrivacy" class="link" role="button" tabindex="0" aria-controls="privacyDialog">lees meer</span>)</p>
     </div>
   </div>
 
@@ -166,11 +81,11 @@ Contact: support@finetune.audio
   </dialog>
 
   <div class="widget-container hidden" id="widgetContainer"></div>
+  <!-- Important for iOS: preload and keep inline -->
   <audio id="bgMusic" src="BG_Whisper.mp3" loop preload="auto" playsinline webkit-playsinline></audio>
 
   <script>
     /* ====== CONFIG ====== */
-    // Hendric agent (unchanged, just like your current Henric setup)
     const AGENT_ID = "agent_4401k3npmamcf5hawj56bagnz96v";
 
     /* ====== DOM ====== */
@@ -188,12 +103,9 @@ Contact: support@finetune.audio
     document.getElementById("closePrivacy").addEventListener("click", () => privacyDialog.close());
 
     /* ====== Helpers ====== */
-    function setBackground(img) {
-      bg.style.backgroundImage = `url('${img}')`;
-    }
+    function setBackground(img) { bg.style.backgroundImage = `url('${img}')`; }
 
     function injectWidget() {
-      // Load the ElevenLabs widget script if not already present
       if (!document.querySelector('script[src*="elevenlabs.io/convai-widget/index.js"]')) {
         const s = document.createElement("script");
         s.src = "https://elevenlabs.io/convai-widget/index.js";
@@ -201,65 +113,111 @@ Contact: support@finetune.audio
         s.setAttribute("data-elevenlabs-convai", "true");
         document.body.appendChild(s);
       }
-      // Voice volume locked at 100% via CSS var (matches Wadden)
       widgetContainer.innerHTML = `<elevenlabs-convai agent-id="${AGENT_ID}" style="--voice-volume:1;"></elevenlabs-convai>`;
       widgetContainer.classList.remove("hidden");
-      // Reassert convo background once widget mounts (extra reliability)
       setTimeout(() => setBackground("background_convo.png"), 200);
       setTimeout(() => setBackground("background_convo.png"), 1000);
     }
 
-    // Background music setup — constant 20%, no fades
-    let audioCtx, bgGainNode;
-    function setupAudio() {
+    // ====== Audio ======
+    let audioCtx, bgGainNode, mediaElSource, primed = false;
+
+    function createOrResumeCtx() {
       if (!audioCtx) {
         audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      }
+      if (audioCtx.state === 'suspended') {
+        return audioCtx.resume().catch(() => {});
+      }
+      return Promise.resolve();
+    }
+
+    function wireGraphOnce() {
+      if (!bgGainNode) {
         bgGainNode = audioCtx.createGain();
         bgGainNode.gain.value = 0.2; // 20%
-        const src = audioCtx.createMediaElementSource(bgMusic);
-        src.connect(bgGainNode).connect(audioCtx.destination);
       }
-      if (audioCtx.state === "suspended") audioCtx.resume().catch(()=>{});
+      // createMediaElementSource can only be created ONCE per element
+      if (!mediaElSource) {
+        try {
+          mediaElSource = audioCtx.createMediaElementSource(bgMusic);
+          mediaElSource.connect(bgGainNode).connect(audioCtx.destination);
+        } catch (e) {
+          // If it already exists (Safari quirk), ignore
+        }
+      }
     }
 
-    function ensureBedStaysAlive() {
-      // Some browsers pause when the widget initializes; poke it back a few times
-      [150, 600, 1200, 2500].forEach(t => {
-        setTimeout(() => { if (bgMusic.paused) bgMusic.play().catch(()=>{}); }, t);
-      });
+    // Prime audio on the very first user gesture (most reliable across iOS/Android/Chrome)
+    async function primeAudio() {
+      if (primed) return;
+      primed = true;
+      try {
+        await createOrResumeCtx();
+        wireGraphOnce();
+        // Start muted within the gesture, then unmute later — maximizes autoplay success
+        bgMusic.muted = true;
+        // Ensure a load attempt
+        try { bgMusic.load(); } catch {}
+        await bgMusic.play();
+      } catch (err) {
+        console.debug('Prime audio failed:', err);
+        primed = false; // let us retry on next gesture
+      }
     }
 
+    function unmuteAndPlay() {
+      // Unmute and ensure playback keeps going
+      bgMusic.muted = false;
+      const kick = () => bgMusic.play().catch(() => {});
+      kick();
+      [150, 600, 1200, 2500].forEach(t => setTimeout(kick, t));
+    }
+
+    // Extra resilience: if audio context ever gets suspended (tab backgrounded), resume + play
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') {
+        createOrResumeCtx().then(() => unmuteAndPlay());
+      }
+    });
+
+    // ====== Flow ======
     async function startExperience() {
       try {
+        // Ask mic (required by your app) AFTER we've primed audio in the same gesture
         await navigator.mediaDevices.getUserMedia({ audio: true });
       } catch {
         alert("Microfoontoegang geweigerd. Schakel dit in om de tour te gebruiken.");
         return;
       }
 
-      // Hide gate and immediately switch to conversation background (single image)
       gate.classList.add("hidden");
       setBackground("background_convo.png");
-      // Reassert once more shortly after to avoid any race with layout/paint
       setTimeout(() => setBackground("background_convo.png"), 50);
-
-      // Optional nameplate appearance
       setTimeout(() => { nameplate.classList.add("visible"); }, 3000);
 
-      // Audio: start bed at constant 20%
-      setupAudio();
-      bgMusic.play().catch(()=>{});
-      ensureBedStaysAlive();
+      // Unmute + keep it alive now that we're past permissions
+      unmuteAndPlay();
 
-      // Inject the widget (AI at 100%)
+      // Inject the assistant widget
       injectWidget();
-      ensureBedStaysAlive();
     }
 
+    // ====== Event wiring ======
+    // 1) Prime on the earliest possible gesture for best autoplay reliability
+    const GESTURE_EVENTS = ['pointerdown','touchstart','mousedown','keydown'];
+    GESTURE_EVENTS.forEach(ev => allowBtn.addEventListener(ev, primeAudio, { once: false }));
+
+    // 2) Start the experience on click (after prime)
     allowBtn.addEventListener("click", startExperience);
+
+    // 3) Deny just hides the gate
     denyBtn.addEventListener("click", () => gate.classList.add("hidden"));
 
-    // Preload the convo background for snappy switch
+    // 4) Fallback: if a user taps anywhere on the page before pressing Allow, also prime
+    GESTURE_EVENTS.forEach(ev => document.addEventListener(ev, primeAudio, { once: true, capture: true }));
+
+    // 5) Preload background for snappy switch
     (new Image()).src = "background_convo.png";
   </script>
 </body>
