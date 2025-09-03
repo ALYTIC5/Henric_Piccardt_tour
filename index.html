@@ -6,17 +6,15 @@
   <title>Henric Piccardt Tour</title>
   <meta name="theme-color" content="#1d1d1b" />
   <style>
-    html, body {
-      height: 100%; margin: 0; padding: 0; overflow: hidden;
-      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-      background: #000;
-    }
+    html, body { height: 100%; margin: 0; padding: 0; overflow: hidden; font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; background: #000; }
     #bg { position: fixed; inset: 0; background: center center / cover no-repeat; }
+    #nameplate { position: fixed; top: 0; left: 50%; transform: translateX(-50%); max-width: 55%; height: auto; z-index: 15; pointer-events: none; opacity: 0; transition: opacity 1.2s ease-in; }
+    #nameplate.visible { opacity: 1; }
     .hidden { display: none !important; }
 
     /* Permission gate */
     .gate { position: fixed; inset: 0; display: flex; justify-content: center; align-items: flex-end; padding-bottom: 18%; z-index: 20; background: rgba(0,0,0,0.05); }
-    .card { width: min(90vw, 420px); border-radius: 18px; background: rgba(255,255,255,0.85); backdrop-filter: blur(4px); box-shadow: 0 12px 40px rgba(0,0,0,.25); padding: 18px; text-align: center; }
+    .card { width: min(90vw, 420px); border-radius: 18px; background: rgba(255,255,255,0.85); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); box-shadow: 0 12px 40px rgba(0,0,0,.25); padding: 18px; text-align: center; }
     .card h1 { font-size: 1.1rem; margin: 6px 0 10px; }
     .card p { font-size: .95rem; margin: 0 10px 12px; }
     .row { display: flex; gap: 10px; }
@@ -24,14 +22,25 @@
     .btn-allow { background: #0b6efd; color: #fff; }
     .btn-deny { background: #eee; color: #111; }
 
+    .small { font-size: 0.86rem; color: #333; margin-top: 8px; }
+    .link { color: #0b6efd; text-decoration: underline; cursor: pointer; font-weight: 600; }
+
     .widget-container { position: fixed; bottom: 10px; left: 50%; transform: translateX(-50%); width: 92%; max-width: 480px; z-index: 10; }
     .widget-container > elevenlabs-convai, .widget-container iframe { width: 100%; height: 140px; }
+
+    dialog.privacy { width: min(92vw, 560px); border: none; border-radius: 16px; box-shadow: 0 20px 60px rgba(0,0,0,.35); padding: 0; max-height: 80vh; }
+    dialog::backdrop { background: rgba(0,0,0,0.45); }
+    .dialog-body { padding: 18px 18px 6px; }
+    .dialog-header { display:flex; align-items:center; justify-content:space-between; padding: 14px 16px; border-bottom: 1px solid #eee; }
+    .dialog-title { margin:0; font-size: 1rem; font-weight: 800; }
+    .dialog-close { border:none; background:#eee; color:#111; font-weight:700; padding:8px 12px; border-radius:10px; cursor:pointer; }
+    .dialog-content { padding: 0 16px 16px; font-size: .95rem; line-height: 1.45; white-space: pre-wrap; }
   </style>
 </head>
 <body>
   <div id="bg" style="background-image:url('Background 1.png')"></div>
+  <img id="nameplate" src="name-removebg.png" alt="Henric Piccardt" />
 
-  <!-- Permission Gate -->
   <div class="gate" id="gate" role="dialog" aria-modal="true" aria-labelledby="gateTitle">
     <div class="card">
       <h1 id="gateTitle">Microfoon inschakelen?</h1>
@@ -40,77 +49,70 @@
         <button class="btn btn-deny" id="denyBtn">Niet nu</button>
         <button class="btn btn-allow" id="allowBtn">Toestaan</button>
       </div>
+      <p class="small">🌐 Uitgebreider privacy statement (<span id="openPrivacy" class="link" role="button" tabindex="0" aria-controls="privacyDialog">lees meer</span>)</p>
     </div>
   </div>
 
-  <!-- ElevenLabs widget -->
-  <div class="widget-container hidden" id="widgetContainer"></div>
+  <dialog id="privacyDialog" class="privacy" aria-labelledby="privacyTitle">
+    <div class="dialog-header">
+      <h2 class="dialog-title" id="privacyTitle">🌐 Uitgebreider privacy statement</h2>
+      <button class="dialog-close" id="closePrivacy" aria-label="Sluiten">Sluiten</button>
+    </div>
+    <div class="dialog-body">
+      <div class="dialog-content">
+Privacyverklaring interactieve audiotour
 
-  <!-- Background Music (permanently Whisper) -->
+Deze applicatie wordt aangeboden door Fine Tune Audio. Wanneer u met Henric Piccardt in gesprek gaat, verwerken wij uw ingevoerde tekst of gesproken woorden om direct een antwoord te genereren. Hiervoor maken wij gebruik van:
+
+OpenAI (taalverwerking)
+
+ElevenLabs (tekst-naar-spraak)
+
+Uw gegevens worden uitsluitend gebruikt om de gesprekken in realtime mogelijk te maken. Ze worden niet opgeslagen door Fine Tune Audio, OpenAI of ElevenLabs.
+
+Rechtsgrond: dit gebeurt op basis van uw toestemming.
+Uw rechten: u kunt uw toestemming altijd intrekken en vragen stellen over de verwerking.
+Contact: support@finetune.audio
+      </div>
+    </div>
+  </dialog>
+
+  <div class="widget-container hidden" id="widgetContainer"></div>
+  <!-- Important for iOS: preload and keep inline -->
   <audio id="bgMusic" src="BG_Whisper.mp3" loop preload="auto" playsinline webkit-playsinline></audio>
 
   <script>
+    /* ====== CONFIG ====== */
     const AGENT_ID = "agent_4401k3npmamcf5hawj56bagnz96v";
+    const talkBackgrounds = ["background_convo.png", "background_talk2.png"];    // placeholder names for talk-state images
+    const listenBackgrounds = ["background_listen1.png", "background_listen2.png"]; // placeholder names for listen-state images
 
+    /* ====== DOM ====== */
     const bg = document.getElementById("bg");
     const gate = document.getElementById("gate");
     const allowBtn = document.getElementById("allowBtn");
     const denyBtn = document.getElementById("denyBtn");
     const widgetContainer = document.getElementById("widgetContainer");
     const bgMusic = document.getElementById("bgMusic");
+    const nameplate = document.getElementById("nameplate");
 
-    // Mute the element's own output; all sound goes through Web Audio @ 0.2
-    bgMusic.volume = 0;
+    // Privacy dialog behavior
+    const privacyDialog = document.getElementById("privacyDialog");
+    document.getElementById("openPrivacy").addEventListener("click", () => privacyDialog.showModal());
+    document.getElementById("closePrivacy").addEventListener("click", () => privacyDialog.close());
 
-    let audioCtx, bgGainNode, mediaElSource, primed = false;
-
-    function createOrResumeCtx() {
-      if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-      if (audioCtx.state === 'suspended') return audioCtx.resume().catch(() => {});
-      return Promise.resolve();
-    }
-
-    function wireGraphOnce() {
-      if (!bgGainNode) {
-        bgGainNode = audioCtx.createGain();
-        bgGainNode.gain.value = 0.2; // fixed 20%
-      }
-      if (!mediaElSource) {
-        try {
-          mediaElSource = audioCtx.createMediaElementSource(bgMusic);
-          mediaElSource.connect(bgGainNode).connect(audioCtx.destination);
-        } catch {}
-      }
-    }
-
-    async function primeAudio() {
-      // Play muted during a gesture to satisfy autoplay policies
-      try {
-        await createOrResumeCtx();
-        wireGraphOnce();
-        bgMusic.muted = true;
-        bgMusic.load();
-        await bgMusic.play();
-        primed = true;
-      } catch (err) {
-        primed = false; // we'll try again on click
-      }
-    }
-
-    function robustPlayUnmuted() {
-      // Unmute and aggressively ensure playback continues
-      bgMusic.muted = false;
-      const tryPlay = () => bgMusic.play().catch(() => {});
-      tryPlay();
-      [100, 300, 800, 1500, 3000].forEach(t => setTimeout(tryPlay, t));
+    /* ====== Helpers ====== */
+    function setBackground(img) {
+      bg.style.backgroundImage = `url('${img}')`;
     }
 
     function injectWidget() {
-      // Primary + fallback loader
-      function loadScript(src, cb) {
+      // Load ElevenLabs Convai widget script with fallback
+      function loadScript(src, onload) {
         const s = document.createElement("script");
-        s.src = src; s.async = true;
-        s.onload = cb;
+        s.src = src;
+        s.async = true;
+        s.onload = onload;
         s.onerror = () => console.warn("Failed loading", src);
         document.body.appendChild(s);
       }
@@ -123,55 +125,150 @@
       }
       widgetContainer.innerHTML = `<elevenlabs-convai agent-id="${AGENT_ID}" style="--voice-volume:1;"></elevenlabs-convai>`;
       widgetContainer.classList.remove("hidden");
+      // Ensure conversation background is set (in case of any delay or override)
+      setTimeout(() => setBackground("background_convo.png"), 200);
+      setTimeout(() => setBackground("background_convo.png"), 1000);
+      // Start cycling background images based on agent state
+      startBackgroundCycle();
     }
 
-    async function startExperience() {
-      // Ask mic inside the same gesture
-      try { await navigator.mediaDevices.getUserMedia({ audio: true }); }
-      catch { alert("Microfoontoegang geweigerd."); return; }
+    function startBackgroundCycle() {
+      let currentState = null;
+      let imgIndex = 0;
+      setInterval(() => {
+        // Infer widget state from its text content
+        let text = widgetContainer.innerText || widgetContainer.textContent || "";
+        text = text.toLowerCase();
+        let newState = currentState;
+        if (text.includes("interrupt")) {
+          newState = "talk";
+        } else if (text.includes("listening")) {
+          newState = "listen";
+        }
+        if (newState !== currentState && (newState === "talk" || newState === "listen")) {
+          // State changed: reset index and update immediately
+          currentState = newState;
+          imgIndex = 0;
+          if (currentState === "talk" && talkBackgrounds.length) {
+            setBackground(talkBackgrounds[imgIndex]);
+          } else if (currentState === "listen" && listenBackgrounds.length) {
+            setBackground(listenBackgrounds[imgIndex]);
+          }
+        } else if (currentState === "talk" && talkBackgrounds.length) {
+          // Cycle next talk image
+          imgIndex = (imgIndex + 1) % talkBackgrounds.length;
+          setBackground(talkBackgrounds[imgIndex]);
+        } else if (currentState === "listen" && listenBackgrounds.length) {
+          // Cycle next listen image
+          imgIndex = (imgIndex + 1) % listenBackgrounds.length;
+          setBackground(listenBackgrounds[imgIndex]);
+        }
+      }, 2000);
+    }
 
-      // Make absolutely sure the audio graph exists before playing
-      await createOrResumeCtx();
-      wireGraphOnce();
+    // ====== Audio ======
+    // Use Web Audio API to manage background music at fixed 20% volume
+    let audioCtx, bgGainNode, mediaElSource, primed = false;
 
-      // If we didn't manage to prime earlier, do it now (still inside click)
-      if (!primed) {
+    function createOrResumeCtx() {
+      if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      }
+      if (audioCtx.state === 'suspended') {
+        return audioCtx.resume().catch(() => {});
+      }
+      return Promise.resolve();
+    }
+
+    function wireGraphOnce() {
+      if (!bgGainNode) {
+        bgGainNode = audioCtx.createGain();
+        bgGainNode.gain.value = 0.2;  // fixed 20% volume
+      }
+      // createMediaElementSource can only be called once per element
+      if (!mediaElSource) {
         try {
-          bgMusic.muted = true;
-          bgMusic.load();
-          await bgMusic.play();
-          primed = true;
-        } catch {}
+          mediaElSource = audioCtx.createMediaElementSource(bgMusic);
+          mediaElSource.connect(bgGainNode).connect(audioCtx.destination);
+        } catch (e) {
+          // Ignore if already created (Safari might throw)
+        }
+      }
+    }
+
+    // Prime audio on the very first user gesture (to satisfy autoplay policy)
+    async function primeAudio() {
+      if (primed) return;
+      primed = true;
+      try {
+        await createOrResumeCtx();
+        wireGraphOnce();
+        // Play silently (muted) within the gesture to allow later autoplay
+        bgMusic.muted = true;
+        try { bgMusic.load(); } catch {}
+        await bgMusic.play();
+      } catch (err) {
+        console.debug('Prime audio failed:', err);
+        primed = false;  // will retry on next gesture
+      }
+    }
+
+    function unmuteAndPlay() {
+      // Unmute and make sure music is playing (retry a few times if needed)
+      bgMusic.muted = false;
+      const kick = () => bgMusic.play().catch(() => {});
+      kick();
+      [150, 600, 1200, 2500].forEach(t => setTimeout(kick, t));
+    }
+
+    // Resume audio context and playback if tab was hidden and comes back
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') {
+        createOrResumeCtx().then(() => unmuteAndPlay());
+      }
+    });
+
+    // ====== Flow ======
+    async function startExperience() {
+      try {
+        // Request microphone access (prompt user) after priming audio
+        await navigator.mediaDevices.getUserMedia({ audio: true });
+      } catch {
+        alert("Microfoontoegang geweigerd. Schakel dit in om de tour te gebruiken.");
+        return;
       }
 
-      // Switch background and start music (unmuted) with retries
+      // Hide permission gate overlay
       gate.classList.add("hidden");
-      bg.style.backgroundImage = "url('background_convo.png')";
-      robustPlayUnmuted();
+      // Switch to conversation background
+      setBackground("background_convo.png");
+      setTimeout(() => setBackground("background_convo.png"), 50);
+      // Fade in the nameplate after 3 seconds
+      setTimeout(() => { nameplate.classList.add("visible"); }, 3000);
 
-      // Widget
+      // Start background music (unmuted) now that permission is granted
+      unmuteAndPlay();
+
+      // Inject the voice assistant widget
       injectWidget();
     }
 
-    // Event wiring
-    // Pre-prime on any early gesture for better iOS reliability
-    ["pointerdown","touchstart","mousedown","keydown"].forEach(ev => {
-      allowBtn.addEventListener(ev, primeAudio, { once: false });
-    });
-    // Start on click
-    allowBtn.addEventListener("click", startExperience);
-    denyBtn.addEventListener("click", () => gate.classList.add("hidden"));
-    // One-time page-level prime (in case user taps elsewhere first)
-    ["pointerdown","touchstart","mousedown","keydown"].forEach(ev => {
-      document.addEventListener(ev, primeAudio, { once: true, capture: true });
-    });
+    // ====== Event wiring ======
+    // 1) Prime audio on the earliest possible user interaction for autoplay
+    const GESTURE_EVENTS = ['pointerdown', 'touchstart', 'mousedown', 'keydown'];
+    GESTURE_EVENTS.forEach(ev => allowBtn.addEventListener(ev, primeAudio, { once: false }));
 
-    // If the tab regains focus or the context suspends, resume + ensure playback
-    document.addEventListener("visibilitychange", () => {
-      if (document.visibilityState === "visible") {
-        createOrResumeCtx().then(() => robustPlayUnmuted());
-      }
-    });
+    // 2) Start the experience on Allow button click (after priming)
+    allowBtn.addEventListener("click", startExperience);
+
+    // 3) Deny button just hides the permission gate
+    denyBtn.addEventListener("click", () => gate.classList.add("hidden"));
+
+    // 4) Fallback: if user taps anywhere on page before clicking Allow, also prime audio
+    GESTURE_EVENTS.forEach(ev => document.addEventListener(ev, primeAudio, { once: true, capture: true }));
+
+    // 5) Preload background images for smooth switching
+    [...talkBackgrounds, ...listenBackgrounds].forEach(src => { if(src) (new Image()).src = src; });
   </script>
 </body>
 </html>
