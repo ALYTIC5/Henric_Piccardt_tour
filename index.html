@@ -190,18 +190,13 @@ Contact: support@finetune.audio
     // Preload convo background for instant swap
     (new Image()).src = CONVO_BG;
 
-    /* ====== AUDIO GRAPH — ALWAYS-START STRATEGY ======
-       - Web Audio only path: mute the element's default sink.
-       - Gain at 0.2 guarantees bed is 20% of full-scale.
-       - Aggressive re-tries + lifecycle hooks keep it alive.
-    =================================================== */
+    /* ====== AUDIO GRAPH — ALWAYS-START STRATEGY ====== */
     let audioCtx, bgSource, bgGain;
 
     function setupAudio() {
       if (!audioCtx) {
         audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 
-        // Build graph
         bgSource = audioCtx.createMediaElementSource(bgMusic);
         bgGain   = audioCtx.createGain();
         bgGain.gain.value = 0.20; // constant 20%
@@ -212,7 +207,6 @@ Contact: support@finetune.audio
         bgMusic.muted  = true;
         bgMusic.volume = 1.0;
 
-        // Resume context when tab regains focus (iOS/Safari)
         document.addEventListener("visibilitychange", () => {
           if (document.visibilityState === "visible" && audioCtx.state === "suspended") {
             audioCtx.resume().catch(()=>{});
@@ -232,23 +226,13 @@ Contact: support@finetune.audio
       }
     }
 
-    // Multiple layers of retries to defeat autoplay/WebRTC pauses
     function nudgePlay() {
-      // Quick-fire nudges (first ~1.5s)
       [0, 120, 240, 480, 960, 1440].forEach(ms => {
-        setTimeout(() => {
-          if (bgMusic.paused) bgMusic.play().catch(()=>{});
-        }, ms);
+        setTimeout(() => { if (bgMusic.paused) bgMusic.play().catch(()=>{}); }, ms);
       });
-
-      // Short backoff series (up to ~8s)
       [2000, 3000, 4500, 6000, 8000].forEach(ms => {
-        setTimeout(() => {
-          if (bgMusic.paused) bgMusic.play().catch(()=>{});
-        }, ms);
+        setTimeout(() => { if (bgMusic.paused) bgMusic.play().catch(()=>{}); }, ms);
       });
-
-      // RAF pinger for the first 2 seconds (catches very brief interruptions)
       const start = performance.now();
       function rafKick(t) {
         if (!bgMusic.paused) return;
@@ -259,37 +243,82 @@ Contact: support@finetune.audio
     }
 
     function startBed() {
-      // Reset to start and begin
       try { bgMusic.currentTime = 0; } catch(e) {}
       bgMusic.play().catch(()=>{});
       nudgePlay();
-
-      // If the element ever gets paused unexpectedly, bring it back
       bgMusic.addEventListener("pause", () => {
-        // Ignore if the page is hidden (we'll resume on pageshow/visibilitychange)
         if (document.visibilityState !== "visible") return;
         bgMusic.play().catch(()=>{});
         nudgePlay();
       });
     }
 
-    /* ====== ELEVENLABS WIDGET (AI @100%) ====== */
-    function injectWidget() {
-      if (!document.querySelector('script[src*="@elevenlabs/convai-widget-embed"]')) {
-        const s = document.createElement("script");
-        s.src = "https://unpkg.com/@elevenlabs/convai-widget-embed";
+    /* ====== ELEVENLABS WIDGET (AI @100%) ======
+       Robust loader: try unpkg first, then ElevenLabs CDN.
+    ================================================= */
+    const WIDGET_PRIMARY = 'https://unpkg.com/@elevenlabs/convai-widget-embed';
+    const WIDGET_FALLBACK = 'https://elevenlabs.io/convai-widget/index.js';
+
+    function ensureScript(src, attrs = {}) {
+      return new Promise((resolve, reject) => {
+        const existing = document.querySelector(`script[src="${src}"]`);
+        if (existing && existing.dataset._loaded === "1") {
+          resolve();
+          return;
+        }
+        const s = existing || document.createElement('script');
+        s.src = src;
         s.async = true;
-        document.head.appendChild(s);
+        Object.entries(attrs).forEach(([k,v]) => s.setAttribute(k, v));
+        s.onload = () => { s.dataset._loaded = "1"; resolve(); };
+        s.onerror = reject;
+        if (!existing) document.head.appendChild(s);
+      });
+    }
+
+    function waitForElementDefined(name, timeoutMs = 3000) {
+      if (customElements.get(name)) return Promise.resolve();
+      return new Promise((resolve, reject) => {
+        let done = false;
+        const to = setTimeout(() => {
+          if (!done) { done = true; reject(new Error('timeout')); }
+        }, timeoutMs);
+        customElements.whenDefined(name).then(() => {
+          if (!done) { done = true; clearTimeout(to); resolve(); }
+        }).catch(err => {
+          if (!done) { done = true; clearTimeout(to); reject(err); }
+        });
+      });
+    }
+
+    async function injectWidget() {
+      // Try primary
+      let defined = false;
+      try {
+        await ensureScript(WIDGET_PRIMARY);
+        await waitForElementDefined('elevenlabs-convai', 2500);
+        defined = true;
+      } catch(_) {}
+
+      // Fallback if not defined
+      if (!defined) {
+        try {
+          await ensureScript(WIDGET_FALLBACK, { 'data-elevenlabs-convai': 'true' });
+          await waitForElementDefined('elevenlabs-convai', 4000);
+          defined = true;
+        } catch (e) {
+          console.warn('ElevenLabs widget failed to load from both sources.', e);
+        }
       }
+
+      // Insert widget either way; if defined it will upgrade immediately when ready
       widgetContainer.innerHTML =
         `<elevenlabs-convai agent-id="${AGENT_ID}" style="--voice-volume:1;"></elevenlabs-convai>`;
       widgetContainer.classList.remove("hidden");
 
-      // Extra background reassert (rare race when iframe mounts)
+      // Extra background reassert + audio nudges
       setTimeout(() => bg.style.backgroundImage = `url('${CONVO_BG}')`, 150);
       setTimeout(() => bg.style.backgroundImage = `url('${CONVO_BG}')`, 600);
-
-      // Widget initialization can sometimes bump audio — nudge again
       setTimeout(nudgePlay, 300);
       setTimeout(nudgePlay, 1200);
     }
@@ -297,27 +326,21 @@ Contact: support@finetune.audio
     /* ====== PERMISSION FLOW ====== */
     async function startExperience() {
       try {
-        // Request mic; keep it simple (disabling processing is fine, but not required for starting bed)
         await navigator.mediaDevices.getUserMedia({ audio: true });
       } catch {
         alert("Microfoontoegang geweigerd. Schakel dit in om de tour te gebruiken.");
         return;
       }
 
-      // Hide gate and switch immediately to the conversation background (single image)
       gate.classList.add("hidden");
       bg.style.backgroundImage = `url('${CONVO_BG}')`;
-      // Reassert shortly after to avoid any race with layout/paint
       setTimeout(() => bg.style.backgroundImage = `url('${CONVO_BG}')`, 50);
 
-      // Optional nameplate appearance
       setTimeout(() => { nameplate.classList.add("visible"); }, 3000);
 
-      // Audio: set up graph and start bed at constant 20%
       setupAudio();
       startBed();
 
-      // Inject the widget (AI at 100%)
       injectWidget();
     }
 
