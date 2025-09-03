@@ -2,10 +2,7 @@
 <html lang="nl">
 <head>
   <meta charset="utf-8" />
-  <meta
-    name="viewport"
-    content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no"
-  />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no" />
   <title>Henric Piccardt Tour</title>
   <meta name="theme-color" content="#1d1d1b" />
   <style>
@@ -134,7 +131,7 @@
         <button class="btn btn-allow" id="allowBtn">Toestaan</button>
       </div>
       <p class="small">
-        🌐 Uitgebreider privacy statement
+        🌐 Uitgebreder privacy statement
         (<span id="openPrivacy" class="link" role="button" tabindex="0" aria-controls="privacyDialog">lees meer</span>)
       </p>
     </div>
@@ -186,7 +183,7 @@ Contact: support@finetune.audio
     let cycleInterval = null;
     const talkImages   = ["bg_talk_1.png","bg_talk_2.png","bg_talk_3.png"];
     const listenImages = ["bg_listen_2.png","bg_listen_3.png","bg_listen_4.png"];
-    const allImages    = ["Background 1.png","background_convo.png",...talkImages,...listenImages];
+    const allImages    = ["Background 1.png","background_convo.png", ...talkImages, ...listenImages];
     allImages.forEach(src => { const i = new Image(); i.src = src; });
 
     function setBackground(img) {
@@ -200,13 +197,32 @@ Contact: support@finetune.audio
       }, 2000);
     }
     function stopCycle() {
-      if (cycleInterval) { clearInterval(cycleInterval); cycleInterval = null; }
+      if (cycleInterval) {
+        clearInterval(cycleInterval);
+        cycleInterval = null;
+      }
     }
 
     function attachFallbackWatcher(widgetEl) {
-      setTimeout(() => {
+      let attachAttempts = 0;
+      function tryAttach() {
+        attachAttempts++;
         const root = widgetEl.shadowRoot;
-        if (!root) return;
+        if (!root) {
+          if (attachAttempts < 50) setTimeout(tryAttach, 100);
+          return;
+        }
+        // Root found, immediately set appropriate background
+        const initialTxt = root.textContent.toLowerCase();
+        if (initialTxt.includes("listening")) {
+          startCycle(listenImages);
+        } else if (initialTxt.includes("talk to interrupt")) {
+          startCycle(talkImages);
+        } else {
+          stopCycle();
+          setBackground("background_convo.png");
+        }
+        // Observe for further changes in widget text
         const observer = new MutationObserver(() => {
           const txt = root.textContent.toLowerCase();
           if (txt.includes("listening")) {
@@ -219,7 +235,8 @@ Contact: support@finetune.audio
           }
         });
         observer.observe(root, { subtree: true, characterData: true, childList: true });
-      }, 300);
+      }
+      setTimeout(tryAttach, 300);
     }
 
     function injectWidget() {
@@ -242,11 +259,13 @@ Contact: support@finetune.audio
       if (!audioCtx) {
         audioCtx = new (window.AudioContext || window.webkitAudioContext)();
         bgGainNode = audioCtx.createGain();
-        bgGainNode.gain.value = 0.2;
+        bgGainNode.gain.value = 0.2;  /* 20% volume for background music */
         const src = audioCtx.createMediaElementSource(bgMusic);
         src.connect(bgGainNode).connect(audioCtx.destination);
       }
-      if (audioCtx.state === "suspended") audioCtx.resume().catch(()=>{});
+      if (audioCtx.state === "suspended") {
+        audioCtx.resume().catch(() => {});
+      }
     }
 
     async function startExperience() {
@@ -258,6 +277,7 @@ Contact: support@finetune.audio
       }
 
       gate.classList.add("hidden");
+      setBackground("background_convo.png");  /* Switch to conversation background */
 
       // Fade in the nameplate (top-center) after 3 seconds
       setTimeout(() => {
@@ -265,8 +285,12 @@ Contact: support@finetune.audio
       }, 3000);
 
       setupAudio();
-      bgMusic.play().catch(()=>{});
+      bgMusic.play().catch(() => {});
       injectWidget();
+      // Ensure background music remains playing if it was paused due to widget initialization
+      if (bgMusic.paused) {
+        bgMusic.play().catch(() => {});
+      }
     }
 
     allowBtn.addEventListener("click", startExperience);
