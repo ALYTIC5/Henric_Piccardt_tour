@@ -3,298 +3,210 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no" />
-  <title>Henric Piccardt Tour</title>
+  <title>Henric Piccardt – Voice Tour</title>
   <meta name="theme-color" content="#1d1d1b" />
   <style>
+    /* Page base */
     html, body {
-      height: 100%;
-      margin: 0;
-      padding: 0;
-      overflow: hidden;
+      margin: 0; padding: 0;
+      width: 100%; height: 100%;
       font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
       background: #000;
+      overflow: hidden; /* unlocked after consent */
     }
 
-    /* Background layer (unchanged position) */
+    /* Single full-screen background image of Hendric */
     #bg {
       position: fixed;
       inset: 0;
       background: center center / cover no-repeat;
+      z-index: 0;
     }
 
-    /* Nameplate: top-center, same physical location, size between too small (40%) and too big (70%) */
+    /* Optional nameplate (keep or remove) */
     #nameplate {
       position: fixed;
-      top: 0;                       /* very top */
+      top: 0;
       left: 50%;
-      transform: translateX(-50%);  /* centered horizontally */
-      max-width: 55%;               /* BETWEEN 40% and 70% */
+      transform: translateX(-50%);
+      max-width: 55%;
       height: auto;
-      z-index: 15;
+      z-index: 3;
       pointer-events: none;
-      opacity: 0;                   /* fade-in after permission */
+      opacity: 0;
       transition: opacity 1.2s ease-in;
     }
     #nameplate.visible { opacity: 1; }
 
-    .hidden { display: none !important; }
-
-    /* Permission gate */
-    .gate {
-      position: fixed;
-      inset: 0;
-      display: flex;
-      justify-content: center;
-      align-items: flex-end;
-      padding-bottom: 18%;
-      z-index: 20;
-      background: rgba(0,0,0,0.05);
-    }
-    .card {
-      width: min(90vw, 420px);
-      border-radius: 18px;
-      background: rgba(255,255,255,0.85);
-      backdrop-filter: blur(4px);
-      -webkit-backdrop-filter: blur(4px);
-      box-shadow: 0 12px 40px rgba(0,0,0,.25);
-      padding: 18px;
-      text-align: center;
-    }
-    .card h1 { font-size: 1.1rem; margin: 6px 0 10px; }
-    .card p { font-size: .95rem; margin: 0 10px 12px; }
-    .row { display: flex; gap: 10px; }
-    .btn {
-      flex: 1 1 auto;
-      padding: 12px 14px;
-      border-radius: 12px;
-      border: 2px solid transparent;
-      font-weight: 600;
-      cursor: pointer;
-    }
-    .btn-allow { background: #0b6efd; color: #fff; }
-    .btn-deny { background: #eee; color: #111; }
-
-    .small { font-size: 0.86rem; color: #333; margin-top: 8px; }
-    .link { color: #0b6efd; text-decoration: underline; cursor: pointer; font-weight: 600; }
-
+    /* Widget container pinned near bottom-center */
     .widget-container {
       position: fixed;
-      bottom: 10px;
+      bottom: 16px;
       left: 50%;
       transform: translateX(-50%);
-      width: 92%;
-      max-width: 480px;
-      z-index: 10;
+      width: min(92vw, 600px);
+      z-index: 2;
     }
     .widget-container > elevenlabs-convai,
     .widget-container iframe {
       width: 100%;
-      height: 140px;
+      height: 150px;
     }
 
-    /* Privacy dialog */
-    dialog.privacy {
-      width: min(92vw, 560px);
-      border: none;
+    /* ================= CONSENT OVERLAY (FULL WHITE SCREEN) ================= */
+    #consentOverlay {
+      position: fixed; inset: 0;
+      background: #fff;
+      display: flex; align-items: center; justify-content: center;
+      z-index: 99999;
+    }
+    #consentBox {
+      width: min(92vw, 520px);
+      border: 2px solid #1D1D1B;
       border-radius: 16px;
-      box-shadow: 0 20px 60px rgba(0,0,0,.35);
-      padding: 0;
-      max-height: 80vh;
+      background: #fff;
+      box-shadow: 0 12px 40px rgba(0,0,0,0.15);
+      padding: 24px 22px;
+      text-align: center;
+      color: #1D1D1B;
     }
-    dialog::backdrop { background: rgba(0,0,0,0.45); }
-    .dialog-body { padding: 18px 18px 6px; }
-    .dialog-header {
-      display:flex; align-items:center; justify-content:space-between;
-      padding: 14px 16px; border-bottom: 1px solid #eee;
+    #consentBox h2 { margin: 0 0 12px; font-size: 22px; line-height: 1.2; }
+    #consentBox p  { margin: 0 0 18px; font-size: 15px; line-height: 1.45; opacity: 0.85; }
+    .consentButtons {
+      display: flex; gap: 12px; justify-content: center; align-items: center; margin-top: 6px;
     }
-    .dialog-title { margin:0; font-size: 1rem; font-weight: 800; }
-    .dialog-close {
-      border:none; background:#eee; color:#111; font-weight:700;
-      padding:8px 12px; border-radius:10px; cursor:pointer;
+    .consentButtons button {
+      flex: 1 1 auto; padding: 12px 16px;
+      border-radius: 12px; border: 2px solid transparent; font-weight: 800; cursor: pointer;
     }
-    .dialog-content {
-      padding: 0 16px 16px;
-      font-size: .95rem; line-height: 1.45; white-space: pre-wrap;
-    }
+    #consentYes { background: #0b6efd; color: #fff; }
+    #consentYes:hover { filter: brightness(0.95); }
+    #consentNo  { background: #f2f2f2; color: #1D1D1B; border-color: #ddd; }
+    #consentNo:hover  { background: #e9e9e9; }
   </style>
 </head>
 <body>
-  <div id="bg" style="background-image:url('Background 1.png')"></div>
+  <!-- Single image background (set below in JS) -->
+  <div id="bg"></div>
+
+  <!-- Optional nameplate; remove if not needed -->
   <img id="nameplate" src="name-removebg.png" alt="Henric Piccardt" />
 
-  <div class="gate" id="gate" role="dialog" aria-modal="true" aria-labelledby="gateTitle">
-    <div class="card">
-      <h1 id="gateTitle">Microfoon inschakelen?</h1>
-      <p>Deze tour gebruikt de ElevenLabs stem-assistent en heeft toegang tot je microfoon nodig.</p>
-      <div class="row">
-        <button class="btn btn-deny" id="denyBtn">Niet nu</button>
-        <button class="btn btn-allow" id="allowBtn">Toestaan</button>
-      </div>
-      <p class="small">
-        🌐 Uitgebreder privacy statement
-        (<span id="openPrivacy" class="link" role="button" tabindex="0" aria-controls="privacyDialog">lees meer</span>)
+  <!-- Consent gate -->
+  <div id="consentOverlay" role="dialog" aria-modal="true" aria-labelledby="consentTitle">
+    <div id="consentBox">
+      <h2 id="consentTitle">Toestemming vereist</h2>
+      <p>
+        Deze tour gebruikt de ElevenLabs gesprek-widget (microfoon kan worden gevraagd) en achtergrondmuziek.<br>
+        Ga je akkoord om verder te gaan?
       </p>
+      <div class="consentButtons">
+        <button id="consentYes" aria-label="Accepteren en doorgaan">Ja</button>
+        <button id="consentNo"  aria-label="Weigeren en terug">Nee</button>
+      </div>
     </div>
   </div>
 
-  <dialog id="privacyDialog" class="privacy" aria-labelledby="privacyTitle">
-    <div class="dialog-header">
-      <h2 class="dialog-title" id="privacyTitle">🌐 Uitgebreider privacy statement</h2>
-      <button class="dialog-close" id="closePrivacy" aria-label="Sluiten">Sluiten</button>
-    </div>
-    <div class="dialog-body">
-      <div class="dialog-content">
-Privacyverklaring interactieve audiotour
+  <!-- Widget goes here -->
+  <div class="widget-container" id="widgetContainer"></div>
 
-Deze applicatie wordt aangeboden door Fine Tune Audio. Wanneer u met Henric Piccardt in gesprek gaat, verwerken wij uw ingevoerde tekst of gesproken woorden om direct een antwoord te genereren. Hiervoor maken wij gebruik van:
-
-OpenAI (taalverwerking)
-
-ElevenLabs (tekst-naar-spraak)
-
-Uw gegevens worden uitsluitend gebruikt om de gesprekken in realtime mogelijk te maken. Ze worden niet opgeslagen door Fine Tune Audio, OpenAI of ElevenLabs.
-
-Rechtsgrond: dit gebeurt op basis van uw toestemming.
-Uw rechten: u kunt uw toestemming altijd intrekken en vragen stellen over de verwerking.
-Contact: support@finetune.audio
-      </div>
-    </div>
-  </dialog>
-
-  <div class="widget-container hidden" id="widgetContainer"></div>
-  <audio id="bgMusic" src="Background Music.mp3" loop preload="auto" playsinline webkit-playsinline></audio>
+  <!-- Background music (loop) -->
+  <audio id="bgAudio" src="Background Music.mp3" loop preload="auto" playsinline webkit-playsinline></audio>
 
   <script>
-    const AGENT_ID = "agent_4401k3npmamcf5hawj56bagnz96v";
-    const bg = document.getElementById("bg");
-    const gate = document.getElementById("gate");
-    const allowBtn = document.getElementById("allowBtn");
-    const denyBtn = document.getElementById("denyBtn");
-    const widgetContainer = document.getElementById("widgetContainer");
-    const bgMusic = document.getElementById("bgMusic");
-    const nameplate = document.getElementById("nameplate");
+    /* ---------------- Configuration ---------------- */
+    // Use your Hendric agent ID (from your existing Henric app).
+    const HENDRIC_AGENT_ID = "agent_4401k3npmamcf5hawj56bagnz96v"; // :contentReference[oaicite:2]{index=2}
+    // Point this to the single Hendric image you want to show after consent:
+    const HERO_IMAGE = "hendric.jpg"; // <-- replace with your actual image file (e.g., "background_convo.png")
 
-    // Privacy dialog
-    const privacyDialog = document.getElementById("privacyDialog");
-    document.getElementById("openPrivacy").addEventListener("click", () => privacyDialog.showModal());
-    document.getElementById("closePrivacy").addEventListener("click", () => privacyDialog.close());
+    // Volumes (match Wadden behavior): BG at 20%, AI at 100%
+    const BG_VOLUME = 0.20;
+    const AI_WIDGET_VOLUME_CSS = 1.0; // widget prop via CSS variable
 
-    // Background cycling
-    let cycleInterval = null;
-    const talkImages   = ["bg_talk_1.png","bg_talk_2.png","bg_talk_3.png"];
-    const listenImages = ["bg_listen_2.png","bg_listen_3.png","bg_listen_4.png"];
-    const allImages    = ["Background 1.png","background_convo.png", ...talkImages, ...listenImages];
-    allImages.forEach(src => { const i = new Image(); i.src = src; });
+    /* ---------------- DOM refs ---------------- */
+    const consentOverlay = document.getElementById('consentOverlay');
+    const consentYes = document.getElementById('consentYes');
+    const consentNo  = document.getElementById('consentNo');
+    const widgetContainer = document.getElementById('widgetContainer');
+    const bgAudio = document.getElementById('bgAudio');
+    const nameplate = document.getElementById('nameplate');
+    const bg = document.getElementById('bg');
 
-    function setBackground(img) {
-      bg.style.backgroundImage = `url('${img}')`;
-    }
-    function startCycle(images) {
-      stopCycle();
-      setBackground(images[Math.floor(Math.random() * images.length)]);
-      cycleInterval = setInterval(() => {
-        setBackground(images[Math.floor(Math.random() * images.length)]);
-      }, 2000);
-    }
-    function stopCycle() {
-      if (cycleInterval) {
-        clearInterval(cycleInterval);
-        cycleInterval = null;
-      }
-    }
-
-    function attachFallbackWatcher(widgetEl) {
-      let attachAttempts = 0;
-      function tryAttach() {
-        attachAttempts++;
-        const root = widgetEl.shadowRoot;
-        if (!root) {
-          if (attachAttempts < 50) setTimeout(tryAttach, 100);
-          return;
-        }
-        // Root found, immediately set appropriate background
-        const initialTxt = root.textContent.toLowerCase();
-        if (initialTxt.includes("listening")) {
-          startCycle(listenImages);
-        } else if (initialTxt.includes("talk to interrupt")) {
-          startCycle(talkImages);
-        } else {
-          stopCycle();
-          setBackground("background_convo.png");
-        }
-        // Observe for further changes in widget text
-        const observer = new MutationObserver(() => {
-          const txt = root.textContent.toLowerCase();
-          if (txt.includes("listening")) {
-            startCycle(listenImages);
-          } else if (txt.includes("talk to interrupt")) {
-            startCycle(talkImages);
-          } else {
-            stopCycle();
-            setBackground("background_convo.png");
-          }
-        });
-        observer.observe(root, { subtree: true, characterData: true, childList: true });
-      }
-      setTimeout(tryAttach, 300);
-    }
-
-    function injectWidget() {
-      if (!document.querySelector('script[src*="elevenlabs.io/convai-widget/index.js"]')) {
-        const s = document.createElement("script");
-        s.src = "https://elevenlabs.io/convai-widget/index.js";
-        s.async = true;
-        s.setAttribute("data-elevenlabs-convai", "true");
-        document.body.appendChild(s);
-      }
-      widgetContainer.innerHTML = `<elevenlabs-convai agent-id="${AGENT_ID}" style="--voice-volume:1;"></elevenlabs-convai>`;
-      widgetContainer.classList.remove("hidden");
-      const widget = widgetContainer.querySelector("elevenlabs-convai");
-      attachFallbackWatcher(widget);
-    }
-
-    // Background music setup (voice 100%, music 20%)
+    /* ---------------- Audio graph (like Wadden) ---------------- */
     let audioCtx, bgGainNode;
-    function setupAudio() {
+
+    function initAudio() {
       if (!audioCtx) {
         audioCtx = new (window.AudioContext || window.webkitAudioContext)();
         bgGainNode = audioCtx.createGain();
-        bgGainNode.gain.value = 0.2;  /* 20% volume for background music */
-        const src = audioCtx.createMediaElementSource(bgMusic);
+        bgGainNode.gain.value = BG_VOLUME; // constant 20%
+        const src = audioCtx.createMediaElementSource(bgAudio);
         src.connect(bgGainNode).connect(audioCtx.destination);
       }
-      if (audioCtx.state === "suspended") {
-        audioCtx.resume().catch(() => {});
+      if (audioCtx.state === 'suspended') {
+        audioCtx.resume().catch(()=>{});
       }
     }
 
-    async function startExperience() {
-      try {
-        await navigator.mediaDevices.getUserMedia({ audio: true });
-      } catch {
-        alert("Microfoontoegang geweigerd. Schakel dit in om de tour te gebruiken.");
-        return;
+    function startBed() {
+      bgAudio.play().catch(()=>{});
+      // Make extra sure it stays playing (some browsers pause on route changes)
+      setTimeout(() => { if (bgAudio.paused) bgAudio.play().catch(()=>{}); }, 400);
+      setTimeout(() => { if (bgAudio.paused) bgAudio.play().catch(()=>{}); }, 1200);
+    }
+
+    /* ---------------- Widget ---------------- */
+    function mountWidget() {
+      // Load ElevenLabs widget script (Wadden approach) :contentReference[oaicite:3]{index=3}
+      if (!document.querySelector('script[src*="@elevenlabs/convai-widget-embed"]')) {
+        const s = document.createElement('script');
+        s.src = 'https://unpkg.com/@elevenlabs/convai-widget-embed';
+        s.async = true;
+        document.head.appendChild(s);
       }
+      // Inject widget with Hendric agent & voice volume locked at 100%
+      widgetContainer.innerHTML =
+        `<elevenlabs-convai agent-id="${HENDRIC_AGENT_ID}" style="--voice-volume:${AI_WIDGET_VOLUME_CSS};"></elevenlabs-convai>`;
+    }
 
-      gate.classList.add("hidden");
-      setBackground("background_convo.png");  /* Switch to conversation background */
+    /* ---------------- Consent flow ---------------- */
+    function grantConsent() {
+      consentOverlay.style.display = 'none';
+      document.documentElement.style.overflow = 'auto';
+      document.body.style.overflow = 'auto';
 
-      // Fade in the nameplate (top-center) after 3 seconds
-      setTimeout(() => {
-        nameplate.classList.add("visible");
-      }, 3000);
+      // Set the single Hendric image
+      bg.style.backgroundImage = `url('${HERO_IMAGE}')`;
 
-      setupAudio();
-      bgMusic.play().catch(() => {});
-      injectWidget();
-      // Ensure background music remains playing if it was paused due to widget initialization
-      if (bgMusic.paused) {
-        bgMusic.play().catch(() => {});
+      // Optional: show nameplate after a short moment
+      setTimeout(() => { nameplate.classList.add('visible'); }, 2000);
+
+      // Prepare audio and start bed @ 20%
+      initAudio();
+      startBed();
+
+      // Ask for mic once (user just interacted)
+      navigator.mediaDevices.getUserMedia({ audio: true }).catch(()=>{ /* if denied, widget still loads */ });
+
+      // Mount the ElevenLabs widget (AI remains at 100%)
+      mountWidget();
+    }
+
+    function declineConsent() {
+      if (window.history.length > 1) {
+        window.history.back();
+      } else {
+        // neutral fallback
+        window.location.replace('https://sense-of-place.eu/');
       }
     }
 
-    allowBtn.addEventListener("click", startExperience);
-    denyBtn.addEventListener("click", () => gate.classList.add("hidden"));
+    consentYes.addEventListener('click', grantConsent);
+    consentNo.addEventListener('click', declineConsent);
+
+    /* ---------------- Preload single image for snappy swap ---------------- */
+    (new Image()).src = HERO_IMAGE;
   </script>
 </body>
 </html>
