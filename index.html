@@ -298,108 +298,115 @@ Contact: support@finetune.audio
       }, 150);
     }
 
-    /* ====== AUDIO (Web Audio @ 20% with robust start) ====== */
-    // Direct element output OFF; route via Web Audio @ fixed 0.2
-    bgMusic.muted = true;   // ensure element itself outputs nothing
-    bgMusic.volume = 0;     // belt-and-suspenders for some Android builds
+// Direct element output ON at minimal volume to keep iOS audio channel alive
+  bgMusic.muted = false;            // unmute element to engage media channel
+  bgMusic.volume = 0.001;           // play at nearly silent volume (inaudible to user)
 
-    let audioCtx, bgGainNode, mediaElSource, primed = false;
+  let audioCtx, bgGainNode, mediaElSource, primed = false;
 
-    function createOrResumeCtx() {
-      if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-      if (audioCtx.state === "suspended") return audioCtx.resume().catch(()=>{});
-      return Promise.resolve();
-    }
-    function wireGraphOnce() {
-      if (!audioCtx) return;
-      if (!bgGainNode) {
-        bgGainNode = audioCtx.createGain();
-        bgGainNode.gain.value = 0.2; // FIXED 20%
+  function createOrResumeCtx() {
+    if (!audioCtx) {
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      // If supported, use iOS17+ audio session API to avoid silent-mode muting
+      if ("audioSession" in navigator) {
+        try { navigator.audioSession.type = "playback"; } catch(e) {}
       }
-      if (!mediaElSource) {
-        try {
-          mediaElSource = audioCtx.createMediaElementSource(bgMusic);
-          mediaElSource.connect(bgGainNode).connect(audioCtx.destination);
-        } catch(e) {
-          // Safari throws if already connected; safe to ignore
+      // Watch for suspended/interrupted state and resume if needed
+      audioCtx.onstatechange = () => {
+        if (audioCtx.state === "suspended" || audioCtx.state === "interrupted") {
+          audioCtx.resume().catch(()=>{});
+          ensurePlaying();
         }
+      };
+    }
+    if (audioCtx.state === "suspended") {
+      return audioCtx.resume().catch(() => {}); 
+    }
+    return Promise.resolve();
+  }
+
+  function wireGraphOnce() {
+    if (!audioCtx) return;
+    if (!bgGainNode) {
+      bgGainNode = audioCtx.createGain();
+      bgGainNode.gain.value = 0.2; // fixed 20% volume
+    }
+    if (!mediaElSource) {
+      try {
+        mediaElSource = audioCtx.createMediaElementSource(bgMusic);
+        mediaElSource.connect(bgGainNode).connect(audioCtx.destination);
+      } catch (e) {
+        // Safari might throw if already connected; ignore
       }
     }
-    async function primeAudio() {
-      // Play muted during gesture to satisfy mobile autoplay policies
+  }
+
+  async function primeAudio() {
+    // Play muted (nearly silent) during gesture to satisfy autoplay policy
+    try {
+      await createOrResumeCtx();
+      wireGraphOnce();
+      try { bgMusic.load(); } catch {}
+      await bgMusic.play();
+      primed = true;
+    } catch {
+      primed = false; // will retry on next gesture
+    }
+  }
+
+  function ensurePlaying() {
+    // Keep nudging play, because some browsers pause after route or context changes
+    const tryPlay = () => { bgMusic.play().catch(()=>{}); };
+    tryPlay();
+    [120, 400, 900, 1800, 3200, 5000].forEach(t => setTimeout(tryPlay, t));
+  }
+
+  // If the audio element ever pauses unexpectedly, try to resume it
+  bgMusic.addEventListener("pause", () => {
+    if (!bgMusic.loop) return;  // (safety check: only auto-resume our looping bgMusic)
+    bgMusic.play().catch(()=>{});
+  });
+
+  // Resume audio when tab becomes visible again
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") {
+      createOrResumeCtx().then(() => ensurePlaying());
+    }
+  });
+
+  async function startExperience() {
+    // (Mic permission and other logic unchanged)
+    try {
+      await navigator.mediaDevices.getUserMedia({ audio: true });
+    } catch {
+      alert("Microfoontoegang geweigerd. Schakel dit in om de tour te gebruiken.");
+      return;
+    }
+    await createOrResumeCtx();
+    wireGraphOnce();
+    if (!primed) {
       try {
-        await createOrResumeCtx();
-        wireGraphOnce();
         try { bgMusic.load(); } catch {}
         await bgMusic.play();
         primed = true;
-      } catch {
-        primed = false; // Try again on next gesture/click
-      }
+      } catch { /* ignore */ }
     }
-    function ensurePlaying() {
-      // Keep nudging play, because some browsers pause after route changes
-      const tryPlay = () => bgMusic.play().catch(()=>{});
-      tryPlay();
-      [120, 400, 900, 1800, 3200, 5000].forEach(t => setTimeout(tryPlay, t));
-    }
+    // Hide gate, switch background, fade in nameplate (unchanged)
+    gate.classList.add("hidden");
+    setBackground(ALWAYS_BG);
+    setTimeout(() => nameplate.classList.add("visible"), 3000);
+    // Start/ensure music playback (via Web Audio @ 20%)
+    ensurePlaying();
+    // Inject widget and begin background cycling (unchanged)
+    injectWidget();
+  }
 
-    // Resume if the tab becomes visible again
-    document.addEventListener("visibilitychange", () => {
-      if (document.visibilityState === "visible") {
-        createOrResumeCtx().then(() => ensurePlaying());
-      }
-    });
-
-    /* ====== Flow ====== */
-    async function startExperience() {
-      // Mic prompt in the same gesture as starting audio
-      try {
-        await navigator.mediaDevices.getUserMedia({ audio: true });
-      } catch {
-        alert("Microfoontoegang geweigerd. Schakel dit in om de tour te gebruiken.");
-        return;
-      }
-
-      // Make sure graph is ready (again) inside the click
-      await createOrResumeCtx();
-      wireGraphOnce();
-
-      // If we couldn't prime earlier, do it now (still within user gesture)
-      if (!primed) {
-        try {
-          try { bgMusic.load(); } catch {}
-          await bgMusic.play();
-          primed = true;
-        } catch {}
-      }
-
-      // Hide gate and switch to conversation background
-      gate.classList.add("hidden");
-      setBackground(ALWAYS_BG);
-
-      // Fade in the nameplate after 3 seconds
-      setTimeout(() => { nameplate.classList.add("visible"); }, 3000);
-
-      // Start/ensure music playback (via Web Audio @ 20%)
-      ensurePlaying();
-
-      // Inject ElevenLabs widget (with fallback) and begin background cycling
-      injectWidget();
-    }
-
-    /* ====== Events ====== */
-    const GESTURE_EVENTS = ["pointerdown","touchstart","mousedown","keydown"];
-    // Prime audio on earliest gestures (most reliable across mobile)
-    GESTURE_EVENTS.forEach(ev => allowBtn.addEventListener(ev, primeAudio, { once: false }));
-    // Global one-time prime if user taps elsewhere first
-    GESTURE_EVENTS.forEach(ev => document.addEventListener(ev, primeAudio, { once: true, capture: true }));
-
-    // Start the experience
-    allowBtn.addEventListener("click", startExperience);
-
-    // Deny hides the gate
-    denyBtn.addEventListener("click", () => gate.classList.add("hidden"));
-  </script>
+  // Event attachments (unchanged)
+  const GESTURE_EVENTS = ["pointerdown", "touchstart", "mousedown", "keydown"];
+  GESTURE_EVENTS.forEach(ev => allowBtn.addEventListener(ev, primeAudio, { once: false }));
+  GESTURE_EVENTS.forEach(ev => document.addEventListener(ev, primeAudio, { once: true, capture: true }));
+  allowBtn.addEventListener("click", startExperience);
+  denyBtn.addEventListener("click", () => gate.classList.add("hidden"));
+</script>
 </body>
 </html>
