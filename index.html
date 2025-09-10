@@ -26,24 +26,24 @@
       pointer-events: none;
     }
 
-    /* Nameplate: top-center, size between 40% and 70% of screen width */
+    /* Nameplate */
     #nameplate {
       position: fixed;
-      top: 0;  /* top of page */
+      top: 0;
       left: 50%;
       transform: translateX(-50%);
       max-width: 55%;
       height: auto;
       z-index: 15;
       pointer-events: none;
-      opacity: 0;  /* will fade in */
+      opacity: 0;
       transition: opacity 1.2s ease-in;
     }
     #nameplate.visible { opacity: 1; }
 
     .hidden { display: none !important; }
 
-    /* Permission gate modal */
+    /* Permission gate */
     .gate {
       position: fixed;
       inset: 0;
@@ -96,7 +96,7 @@
       height: 140px;
     }
 
-    /* Privacy dialog styles */
+    /* Privacy dialog */
     dialog.privacy {
       width: min(92vw, 560px);
       border: none;
@@ -133,7 +133,7 @@
   </style>
 </head>
 <body>
-  <!-- Background video element (hidden behind permission gate until allowed) -->
+  <!-- Background video -->
   <video id="bgVideo" loop muted playsinline webkit-playsinline preload="auto" poster="Background 1.png">
     <source src="Final_10s.mp4" type="video/mp4" />
   </video>
@@ -155,7 +155,7 @@
     </div>
   </div>
 
-  <!-- Privacy policy dialog (hidden by default) -->
+  <!-- Privacy dialog -->
   <dialog id="privacyDialog" class="privacy" aria-labelledby="privacyTitle">
     <div class="dialog-header">
       <h2 class="dialog-title" id="privacyTitle">🌐 Uitgebreider privacy statement</h2>
@@ -180,17 +180,15 @@ Contact: support@finetune.audio
     </div>
   </dialog>
 
-  <!-- ElevenLabs Convai widget container (initially hidden) -->
+  <!-- Widget container -->
   <div class="widget-container hidden" id="widgetContainer"></div>
 
-  <!-- Background music audio element (looped, output via Web Audio) -->
-  <audio id="bgMusic" src="BG_Lower.mp3" loop preload="auto" playsinline webkit-playsinline></audio>
+  <!-- Background music (no loop, fade out after 15s) -->
+  <audio id="bgMusic" src="BG_Lower.mp3" preload="auto" playsinline webkit-playsinline></audio>
 
   <script>
-    /* ====== CONFIG ====== */
     const AGENT_ID = "agent_5801k4sjkgjtf5krvndp6nx9na33";
 
-    /* ====== DOM Elements ====== */
     const bgVideo       = document.getElementById("bgVideo");
     const gate          = document.getElementById("gate");
     const allowBtn      = document.getElementById("allowBtn");
@@ -199,17 +197,16 @@ Contact: support@finetune.audio
     const bgMusic       = document.getElementById("bgMusic");
     const nameplate     = document.getElementById("nameplate");
 
-    // Privacy dialog event handlers
+    // Privacy dialog
     const privacyDialog = document.getElementById("privacyDialog");
     document.getElementById("openPrivacy").addEventListener("click", () => privacyDialog.showModal());
     document.getElementById("closePrivacy").addEventListener("click", () => privacyDialog.close());
 
-    /* ====== Widget Loader (ElevenLabs Convai) ====== */
+    // Inject ElevenLabs widget
     function injectWidget() {
       function loadScript(src, onload) {
         const s = document.createElement("script");
-        s.src = src;
-        s.async = true;
+        s.src = src; s.async = true;
         s.onload = onload;
         s.onerror = () => console.warn("Failed loading", src);
         document.body.appendChild(s);
@@ -225,8 +222,7 @@ Contact: support@finetune.audio
       widgetContainer.classList.remove("hidden");
     }
 
-    /* ====== Audio Setup for Background Music ====== */
-    // Mute the audio element's direct output and use Web Audio (20% volume)
+    // Web Audio for background music
     bgMusic.muted = true;
     bgMusic.volume = 0;
     let audioCtx, bgGainNode, mediaElSource, primed = false;
@@ -235,28 +231,23 @@ Contact: support@finetune.audio
       if (!audioCtx) {
         audioCtx = new (window.AudioContext || window.webkitAudioContext)();
       }
-      if (audioCtx.state === "suspended") {
-        return audioCtx.resume().catch(() => {});
-      }
+      if (audioCtx.state === "suspended") return audioCtx.resume().catch(() => {});
       return Promise.resolve();
     }
     function wireGraphOnce() {
       if (!audioCtx) return;
       if (!bgGainNode) {
         bgGainNode = audioCtx.createGain();
-        bgGainNode.gain.value = 0.2;  // 20% volume
+        bgGainNode.gain.value = 0.2; // start at 20%
       }
       if (!mediaElSource) {
         try {
           mediaElSource = audioCtx.createMediaElementSource(bgMusic);
           mediaElSource.connect(bgGainNode).connect(audioCtx.destination);
-        } catch (e) {
-          // Ignore if already connected (Safari may throw)
-        }
+        } catch (e) {}
       }
     }
     async function primeAudio() {
-      // Prime the audio by playing silently during a user gesture (for autoplay policy)
       try {
         await createOrResumeCtx();
         wireGraphOnce();
@@ -264,33 +255,27 @@ Contact: support@finetune.audio
         await bgMusic.play();
         primed = true;
       } catch {
-        primed = false;  // will retry on next gesture
+        primed = false;
       }
     }
-    function ensurePlaying() {
-      // Keep trying to play, as some browsers pause looping audio on navigation or sleep
-      const tryPlay = () => { bgMusic.play().catch(() => {}); };
-      tryPlay();
-      [120, 400, 900, 1800, 3200, 5000].forEach(t => setTimeout(tryPlay, t));
+
+    // Fade out background music after 15 seconds
+    function fadeOutMusic() {
+      if (bgGainNode && audioCtx) {
+        const now = audioCtx.currentTime;
+        bgGainNode.gain.setValueAtTime(0.2, now);               // ensure start at 20%
+        bgGainNode.gain.linearRampToValueAtTime(0.0, now + 15); // fade to silence over 15s
+      }
     }
 
-    // If the tab becomes visible again, resume the music if needed
-    document.addEventListener("visibilitychange", () => {
-      if (document.visibilityState === "visible") {
-        createOrResumeCtx().then(() => ensurePlaying());
-      }
-    });
-
-    /* ====== Start Experience Flow ====== */
     async function startExperience() {
-      // Ask for microphone access (user gesture context)
       try {
         await navigator.mediaDevices.getUserMedia({ audio: true });
       } catch {
         alert("Microfoontoegang geweigerd. Schakel dit in om de tour te gebruiken.");
         return;
       }
-      // Initialize audio context and play background music
+
       await createOrResumeCtx();
       wireGraphOnce();
       if (!primed) {
@@ -298,23 +283,23 @@ Contact: support@finetune.audio
           try { bgMusic.load(); } catch {}
           await bgMusic.play();
           primed = true;
-        } catch { /* ignore */ }
+        } catch {}
       }
-      // Hide permission gate and start the background video
+
       gate.classList.add("hidden");
-      if (bgVideo) {
-        bgVideo.play().catch(() => {});
-      }
-      // Fade in the nameplate after a delay
+      if (bgVideo) bgVideo.play().catch(() => {});
+
       setTimeout(() => { nameplate.classList.add("visible"); }, 3000);
-      // Ensure background music continues playing
-      ensurePlaying();
-      // Load and display the ElevenLabs widget
+
+      // Play music and fade it out
+      bgMusic.play().catch(()=>{});
+      fadeOutMusic();
+
       injectWidget();
     }
 
-    // Event listeners for user interactions and permission choices
-    const GESTURE_EVENTS = ["pointerdown", "touchstart", "mousedown", "keydown"];
+    // Events
+    const GESTURE_EVENTS = ["pointerdown","touchstart","mousedown","keydown"];
     GESTURE_EVENTS.forEach(ev => allowBtn.addEventListener(ev, primeAudio, { once: false }));
     GESTURE_EVENTS.forEach(ev => document.addEventListener(ev, primeAudio, { once: true, capture: true }));
     allowBtn.addEventListener("click", startExperience);
