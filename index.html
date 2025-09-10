@@ -15,35 +15,35 @@
       background: #000;
     }
 
-    /* === FULLSCREEN BACKGROUND VIDEO === */
+    /* Background video (full-screen cover) */
     #bgVideo {
       position: fixed;
       inset: 0;
       width: 100%;
       height: 100%;
-      object-fit: cover;      /* fill screen without letterboxing */
-      z-index: 0;             /* under everything */
-      background: #000;
+      object-fit: cover;
+      object-position: center center;
+      pointer-events: none;
     }
 
-    /* Nameplate: top-center */
+    /* Nameplate: top-center, size between 40% and 70% of screen width */
     #nameplate {
       position: fixed;
-      top: 0;
+      top: 0;  /* top of page */
       left: 50%;
       transform: translateX(-50%);
       max-width: 55%;
       height: auto;
       z-index: 15;
       pointer-events: none;
-      opacity: 0;
+      opacity: 0;  /* will fade in */
       transition: opacity 1.2s ease-in;
     }
     #nameplate.visible { opacity: 1; }
 
     .hidden { display: none !important; }
 
-    /* Permission gate */
+    /* Permission gate modal */
     .gate {
       position: fixed;
       inset: 0;
@@ -79,7 +79,7 @@
     .btn-deny { background: #eee; color: #111; }
 
     .small { font-size: 0.86rem; color: #333; margin-top: 8px; }
-    .link { color: #0b6efd; text-decoration: underline; cursor: pointer; font-weight: 600; }
+    .link  { color: #0b6efd; text-decoration: underline; cursor: pointer; font-weight: 600; }
 
     .widget-container {
       position: fixed;
@@ -96,7 +96,7 @@
       height: 140px;
     }
 
-    /* Privacy dialog */
+    /* Privacy dialog styles */
     dialog.privacy {
       width: min(92vw, 560px);
       border: none;
@@ -106,31 +106,40 @@
       max-height: 80vh;
     }
     dialog::backdrop { background: rgba(0,0,0,0.45); }
-    .dialog-body { padding: 18px 18px 6px; }
+    .dialog-body   { padding: 18px 18px 6px; }
     .dialog-header {
-      display:flex; align-items:center; justify-content:space-between;
-      padding: 14px 16px; border-bottom: 1px solid #eee;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 16px;
+      border-bottom: 1px solid #eee;
     }
-    .dialog-title { margin:0; font-size: 1rem; font-weight: 800; }
+    .dialog-title { margin: 0; font-size: 1rem; font-weight: 800; }
     .dialog-close {
-      border:none; background:#eee; color:#111; font-weight:700;
-      padding:8px 12px; border-radius:10px; cursor:pointer;
+      border: none;
+      background: #eee;
+      color: #111;
+      font-weight: 700;
+      padding: 8px 12px;
+      border-radius: 10px;
+      cursor: pointer;
     }
     .dialog-content {
       padding: 0 16px 16px;
-      font-size: .95rem; line-height: 1.45; white-space: pre-wrap;
+      font-size: 0.95rem;
+      line-height: 1.45;
+      white-space: pre-wrap;
     }
   </style>
 </head>
 <body>
-  <!-- === SINGLE BACKGROUND VIDEO ===
-       ▶️ EDIT THIS: put your video filename below (same folder as this HTML).
-       Example: const BG_VIDEO_SRC = "background.mp4";
-       Optional: change the poster image (shown before the video starts). -->
-  <video id="bgVideo" autoplay muted loop playsinline webkit-playsinline poster="Background 1.png"></video>
-
+  <!-- Background video element (hidden behind permission gate until allowed) -->
+  <video id="bgVideo" loop muted playsinline webkit-playsinline preload="auto" poster="Background 1.png">
+    <source src="Final_10s.mp4" type="video/mp4" />
+  </video>
   <img id="nameplate" src="name-removebg.png" alt="Henric Piccardt" />
 
+  <!-- Microphone permission gate -->
   <div class="gate" id="gate" role="dialog" aria-modal="true" aria-labelledby="gateTitle">
     <div class="card">
       <h1 id="gateTitle">Microfoon inschakelen?</h1>
@@ -146,6 +155,7 @@
     </div>
   </div>
 
+  <!-- Privacy policy dialog (hidden by default) -->
   <dialog id="privacyDialog" class="privacy" aria-labelledby="privacyTitle">
     <div class="dialog-header">
       <h2 class="dialog-title" id="privacyTitle">🌐 Uitgebreider privacy statement</h2>
@@ -170,52 +180,36 @@ Contact: support@finetune.audio
     </div>
   </dialog>
 
+  <!-- ElevenLabs Convai widget container (initially hidden) -->
   <div class="widget-container hidden" id="widgetContainer"></div>
 
-  <!-- Background music routed via Web Audio at fixed 0.2 gain -->
+  <!-- Background music audio element (looped, output via Web Audio) -->
   <audio id="bgMusic" src="BG_Lower.mp3" loop preload="auto" playsinline webkit-playsinline></audio>
 
   <script>
     /* ====== CONFIG ====== */
     const AGENT_ID = "agent_4401k3npmamcf5hawj56bagnz96v";
 
-    /* === SET YOUR BACKGROUND VIDEO FILE HERE === */
-    const BG_VIDEO_SRC = "Final_10s.mp4";
-
-    /* ====== DOM ====== */
-    const gate = document.getElementById("gate");
-    const allowBtn = document.getElementById("allowBtn");
-    const denyBtn = document.getElementById("denyBtn");
+    /* ====== DOM Elements ====== */
+    const bgVideo       = document.getElementById("bgVideo");
+    const gate          = document.getElementById("gate");
+    const allowBtn      = document.getElementById("allowBtn");
+    const denyBtn       = document.getElementById("denyBtn");
     const widgetContainer = document.getElementById("widgetContainer");
-    const bgMusic = document.getElementById("bgMusic");
-    const nameplate = document.getElementById("nameplate");
-    const bgVideo = document.getElementById("bgVideo");
+    const bgMusic       = document.getElementById("bgMusic");
+    const nameplate     = document.getElementById("nameplate");
 
-    // Load background video source
-    (function initBgVideo(){
-      const source = document.createElement("source");
-      source.src = BG_VIDEO_SRC;
-      // You can hint type if you like: source.type = "video/mp4";
-      bgVideo.appendChild(source);
-      // Try to autoplay muted (allowed across browsers)
-      const tryPlay = () => bgVideo.play().catch(()=>{});
-      tryPlay();
-      [200, 800, 1800].forEach(t => setTimeout(tryPlay, t));
-      document.addEventListener("visibilitychange", () => {
-        if (document.visibilityState === "visible") tryPlay();
-      });
-    })();
-
-    // Privacy dialog
+    // Privacy dialog event handlers
     const privacyDialog = document.getElementById("privacyDialog");
     document.getElementById("openPrivacy").addEventListener("click", () => privacyDialog.showModal());
     document.getElementById("closePrivacy").addEventListener("click", () => privacyDialog.close());
 
-    /* ====== Widget loader with fallback ====== */
+    /* ====== Widget Loader (ElevenLabs Convai) ====== */
     function injectWidget() {
       function loadScript(src, onload) {
         const s = document.createElement("script");
-        s.src = src; s.async = true;
+        s.src = src;
+        s.async = true;
         s.onload = onload;
         s.onerror = () => console.warn("Failed loading", src);
         document.body.appendChild(s);
@@ -231,48 +225,38 @@ Contact: support@finetune.audio
       widgetContainer.classList.remove("hidden");
     }
 
-    /* ====== AUDIO (Web Audio @ 20% with robust start) ====== */
-    // Keep the element output *barely* audible so iOS treats it as media; actual volume via Web Audio (0.2)
-    bgMusic.muted = false;          // ensure media channel remains active (iOS silent-mode quirk)
-    bgMusic.volume = 0.001;         // practically inaudible; Web Audio gain controls real volume
-
+    /* ====== Audio Setup for Background Music ====== */
+    // Mute the audio element's direct output and use Web Audio (20% volume)
+    bgMusic.muted = true;
+    bgMusic.volume = 0;
     let audioCtx, bgGainNode, mediaElSource, primed = false;
 
     function createOrResumeCtx() {
       if (!audioCtx) {
         audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        // iOS 17+ audio session: treat as media playback (not muted by the silent switch)
-        if ("audioSession" in navigator) {
-          try { navigator.audioSession.type = "playback"; } catch(e) {}
-        }
-        // If the context is suspended/interrupted, resume and ensure playing
-        audioCtx.onstatechange = () => {
-          if (audioCtx.state === "suspended" || audioCtx.state === "interrupted") {
-            audioCtx.resume().catch(()=>{});
-            ensurePlaying();
-          }
-        };
       }
-      if (audioCtx.state === "suspended") return audioCtx.resume().catch(()=>{});
+      if (audioCtx.state === "suspended") {
+        return audioCtx.resume().catch(() => {});
+      }
       return Promise.resolve();
     }
     function wireGraphOnce() {
       if (!audioCtx) return;
       if (!bgGainNode) {
         bgGainNode = audioCtx.createGain();
-        bgGainNode.gain.value = 0.2; // FIXED 20%
+        bgGainNode.gain.value = 0.2;  // 20% volume
       }
       if (!mediaElSource) {
         try {
           mediaElSource = audioCtx.createMediaElementSource(bgMusic);
           mediaElSource.connect(bgGainNode).connect(audioCtx.destination);
-        } catch(e) {
-          // Safari throws if already connected; safe to ignore
+        } catch (e) {
+          // Ignore if already connected (Safari may throw)
         }
       }
     }
     async function primeAudio() {
-      // Play (nearly silent) during gesture to satisfy mobile autoplay policies
+      // Prime the audio by playing silently during a user gesture (for autoplay policy)
       try {
         await createOrResumeCtx();
         wireGraphOnce();
@@ -280,75 +264,60 @@ Contact: support@finetune.audio
         await bgMusic.play();
         primed = true;
       } catch {
-        primed = false; // Try again on next gesture/click
+        primed = false;  // will retry on next gesture
       }
     }
     function ensurePlaying() {
-      const tryPlay = () => bgMusic.play().catch(()=>{});
+      // Keep trying to play, as some browsers pause looping audio on navigation or sleep
+      const tryPlay = () => { bgMusic.play().catch(() => {}); };
       tryPlay();
       [120, 400, 900, 1800, 3200, 5000].forEach(t => setTimeout(tryPlay, t));
     }
 
-    // If the audio element ever pauses unexpectedly (not user-initiated), try to resume it
-    bgMusic.addEventListener("pause", () => {
-      if (!bgMusic.loop) return; // safety: only our looping bg music auto-resumes
-      bgMusic.play().catch(()=>{});
-    });
-
-    // Resume audio when tab becomes visible again
+    // If the tab becomes visible again, resume the music if needed
     document.addEventListener("visibilitychange", () => {
       if (document.visibilityState === "visible") {
         createOrResumeCtx().then(() => ensurePlaying());
       }
     });
 
-    /* ====== Flow ====== */
+    /* ====== Start Experience Flow ====== */
     async function startExperience() {
-      // Mic prompt in the same gesture as starting audio
+      // Ask for microphone access (user gesture context)
       try {
         await navigator.mediaDevices.getUserMedia({ audio: true });
       } catch {
         alert("Microfoontoegang geweigerd. Schakel dit in om de tour te gebruiken.");
         return;
       }
-
-      // Make sure graph is ready (again) inside the click
+      // Initialize audio context and play background music
       await createOrResumeCtx();
       wireGraphOnce();
-
-      // If we couldn't prime earlier, do it now (still within user gesture)
       if (!primed) {
         try {
           try { bgMusic.load(); } catch {}
           await bgMusic.play();
           primed = true;
-        } catch {}
+        } catch { /* ignore */ }
       }
-
-      // Hide gate
+      // Hide permission gate and start the background video
       gate.classList.add("hidden");
-
-      // Fade in the nameplate after 3 seconds
+      if (bgVideo) {
+        bgVideo.play().catch(() => {});
+      }
+      // Fade in the nameplate after a delay
       setTimeout(() => { nameplate.classList.add("visible"); }, 3000);
-
-      // Start/ensure music playback (via Web Audio @ 20%)
+      // Ensure background music continues playing
       ensurePlaying();
-
-      // Inject ElevenLabs widget
+      // Load and display the ElevenLabs widget
       injectWidget();
     }
 
-    /* ====== Events ====== */
-    const GESTURE_EVENTS = ["pointerdown","touchstart","mousedown","keydown"];
-    // Prime audio on earliest gestures (most reliable across mobile)
+    // Event listeners for user interactions and permission choices
+    const GESTURE_EVENTS = ["pointerdown", "touchstart", "mousedown", "keydown"];
     GESTURE_EVENTS.forEach(ev => allowBtn.addEventListener(ev, primeAudio, { once: false }));
-    // Global one-time prime if user taps elsewhere first
     GESTURE_EVENTS.forEach(ev => document.addEventListener(ev, primeAudio, { once: true, capture: true }));
-
-    // Start the experience
     allowBtn.addEventListener("click", startExperience);
-
-    // Deny hides the gate
     denyBtn.addEventListener("click", () => gate.classList.add("hidden"));
   </script>
 </body>
