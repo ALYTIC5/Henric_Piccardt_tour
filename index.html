@@ -288,7 +288,6 @@ Contact: support@finetune.audio
 
       setTimeout(() => { nameplate.classList.add("visible"); }, 3000);
 
-      // Play and fade out
       bgMusic.play().catch(()=>{});
       fadeOutMusic();
 
@@ -300,7 +299,11 @@ Contact: support@finetune.audio
     GESTURE_EVENTS.forEach(ev => allowBtn.addEventListener(ev, primeAudio, { once: false }));
     GESTURE_EVENTS.forEach(ev => document.addEventListener(ev, primeAudio, { once: true, capture: true }));
     allowBtn.addEventListener("click", startExperience);
-    denyBtn.addEventListener("click", () => gate.classList.add("hidden"));
+
+
+    denyBtn.addEventListener("click", () => {
+      window.location.href = "https://fraeylemaborg.nl/agenda/jubileumweekend-50-jaar-museum/";
+    });
   </script>
 </body>
 </html>
