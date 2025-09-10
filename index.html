@@ -261,7 +261,7 @@ Contact: support@finetune.audio
       if (bgGainNode && audioCtx) {
         const now = audioCtx.currentTime;
         bgGainNode.gain.setValueAtTime(0.2, now);
-        bgGainNode.gain.linearRampToValueAtTime(0.0, now + 15);
+        bgGainNode.gain.linearRampToValueAtTime(0.0, now + 60);
       }
     }
 
