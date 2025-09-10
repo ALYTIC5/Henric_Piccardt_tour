@@ -15,7 +15,7 @@
       background: #000;
     }
 
-    /* Background video (full-screen cover) */
+    /* Background video */
     #bgVideo {
       position: fixed;
       inset: 0;
@@ -26,7 +26,6 @@
       pointer-events: none;
     }
 
-    /* Nameplate */
     #nameplate {
       position: fixed;
       top: 0;
@@ -43,7 +42,6 @@
 
     .hidden { display: none !important; }
 
-    /* Permission gate */
     .gate {
       position: fixed;
       inset: 0;
@@ -96,7 +94,6 @@
       height: 140px;
     }
 
-    /* Privacy dialog */
     dialog.privacy {
       width: min(92vw, 560px);
       border: none;
@@ -139,7 +136,7 @@
   </video>
   <img id="nameplate" src="name-removebg.png" alt="Henric Piccardt" />
 
-  <!-- Microphone permission gate -->
+  <!-- Permission gate -->
   <div class="gate" id="gate" role="dialog" aria-modal="true" aria-labelledby="gateTitle">
     <div class="card">
       <h1 id="gateTitle">Microfoon inschakelen?</h1>
@@ -183,7 +180,7 @@ Contact: support@finetune.audio
   <!-- Widget container -->
   <div class="widget-container hidden" id="widgetContainer"></div>
 
-  <!-- Background music (no loop, fade out after 15s) -->
+  <!-- Background music (no loop, fades out after 15s) -->
   <audio id="bgMusic" src="BG_Lower.mp3" preload="auto" playsinline webkit-playsinline></audio>
 
   <script>
@@ -202,7 +199,7 @@ Contact: support@finetune.audio
     document.getElementById("openPrivacy").addEventListener("click", () => privacyDialog.showModal());
     document.getElementById("closePrivacy").addEventListener("click", () => privacyDialog.close());
 
-    // Inject ElevenLabs widget
+    // Widget
     function injectWidget() {
       function loadScript(src, onload) {
         const s = document.createElement("script");
@@ -222,7 +219,7 @@ Contact: support@finetune.audio
       widgetContainer.classList.remove("hidden");
     }
 
-    // Web Audio for background music
+    // Web Audio for fade-out
     bgMusic.muted = true;
     bgMusic.volume = 0;
     let audioCtx, bgGainNode, mediaElSource, primed = false;
@@ -238,7 +235,7 @@ Contact: support@finetune.audio
       if (!audioCtx) return;
       if (!bgGainNode) {
         bgGainNode = audioCtx.createGain();
-        bgGainNode.gain.value = 0.2; // start at 20%
+        bgGainNode.gain.value = 0.2;
       }
       if (!mediaElSource) {
         try {
@@ -259,12 +256,12 @@ Contact: support@finetune.audio
       }
     }
 
-    // Fade out background music after 15 seconds
+    // Fade out after 15s
     function fadeOutMusic() {
       if (bgGainNode && audioCtx) {
         const now = audioCtx.currentTime;
-        bgGainNode.gain.setValueAtTime(0.2, now);               // ensure start at 20%
-        bgGainNode.gain.linearRampToValueAtTime(0.0, now + 15); // fade to silence over 15s
+        bgGainNode.gain.setValueAtTime(0.2, now);
+        bgGainNode.gain.linearRampToValueAtTime(0.0, now + 15);
       }
     }
 
@@ -291,7 +288,7 @@ Contact: support@finetune.audio
 
       setTimeout(() => { nameplate.classList.add("visible"); }, 3000);
 
-      // Play music and fade it out
+      // Play and fade out
       bgMusic.play().catch(()=>{});
       fadeOutMusic();
 
