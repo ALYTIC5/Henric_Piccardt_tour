@@ -164,7 +164,7 @@ Contact: support@finetune.audio
   <div class="widget-container hidden" id="widgetContainer"></div>
 
   <!-- Background music: set to the attached BG_Lower.mp3.
-       Direct element output is muted; audio is routed via Web Audio at fixed 0.2 gain. -->
+       Direct element output is nearly silent; audio is routed via Web Audio at fixed 0.2 gain. -->
   <audio id="bgMusic" src="BG_Lower.mp3" loop preload="auto" playsinline webkit-playsinline></audio>
 
   <script>
@@ -173,7 +173,7 @@ Contact: support@finetune.audio
 
     // Replace these with your actual file names
     const talkImages   = ["bg_talk_1.png","bg_talk_2.png","bg_talk_3.png"];
-    const listenImages = ["bg_listen_2.png","bg_listen_3.png","bg_listen_4.png,"];
+    const listenImages = ["bg_listen_2.png","bg_listen_3.png","bg_listen_4.png,"]; // (left unchanged)
     const ALWAYS_BG    = "background_convo.png";
 
     /* ====== DOM ====== */
@@ -299,14 +299,27 @@ Contact: support@finetune.audio
     }
 
     /* ====== AUDIO (Web Audio @ 20% with robust start) ====== */
-    // Direct element output OFF; route via Web Audio @ fixed 0.2
-    bgMusic.muted = true;   // ensure element itself outputs nothing
-    bgMusic.volume = 0;     // belt-and-suspenders for some Android builds
+    // Keep the element output *barely* audible so iOS treats it as media; actual volume via Web Audio (0.2)
+    bgMusic.muted = false;          // ensure media channel remains active (iOS silent-mode quirk)
+    bgMusic.volume = 0.001;         // practically inaudible; Web Audio gain controls real volume
 
     let audioCtx, bgGainNode, mediaElSource, primed = false;
 
     function createOrResumeCtx() {
-      if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        // iOS 17+ audio session: treat as media playback (not muted by the silent switch)
+        if ("audioSession" in navigator) {
+          try { navigator.audioSession.type = "playback"; } catch(e) {}
+        }
+        // If the context is suspended/interrupted, resume and ensure playing
+        audioCtx.onstatechange = () => {
+          if (audioCtx.state === "suspended" || audioCtx.state === "interrupted") {
+            audioCtx.resume().catch(()=>{});
+            ensurePlaying();
+          }
+        };
+      }
       if (audioCtx.state === "suspended") return audioCtx.resume().catch(()=>{});
       return Promise.resolve();
     }
@@ -326,7 +339,7 @@ Contact: support@finetune.audio
       }
     }
     async function primeAudio() {
-      // Play muted during gesture to satisfy mobile autoplay policies
+      // Play (nearly silent) during gesture to satisfy mobile autoplay policies
       try {
         await createOrResumeCtx();
         wireGraphOnce();
@@ -343,6 +356,12 @@ Contact: support@finetune.audio
       tryPlay();
       [120, 400, 900, 1800, 3200, 5000].forEach(t => setTimeout(tryPlay, t));
     }
+
+    // If the audio element ever pauses unexpectedly (not user-initiated), try to resume it
+    bgMusic.addEventListener("pause", () => {
+      if (!bgMusic.loop) return; // safety: only our looping bg music auto-resumes
+      bgMusic.play().catch(()=>{});
+    });
 
     // Resume if the tab becomes visible again
     document.addEventListener("visibilitychange", () => {
