@@ -180,26 +180,26 @@ Contact: support@finetune.audio
   <!-- Widget container -->
   <div class="widget-container hidden" id="widgetContainer"></div>
 
-  <!-- Background music (no loop, fades out after 15s) -->
+  <!-- Background music (play once after permission) -->
   <audio id="bgMusic" src="Final_Music_Piccardt.mp3" preload="auto" playsinline webkit-playsinline></audio>
 
   <script>
     const AGENT_ID = "agent_5801k4sjkgjtf5krvndp6nx9na33";
 
-    const bgVideo       = document.getElementById("bgVideo");
-    const gate          = document.getElementById("gate");
-    const allowBtn      = document.getElementById("allowBtn");
-    const denyBtn       = document.getElementById("denyBtn");
+    const bgVideo         = document.getElementById("bgVideo");
+    const gate            = document.getElementById("gate");
+    const allowBtn        = document.getElementById("allowBtn");
+    const denyBtn         = document.getElementById("denyBtn");
     const widgetContainer = document.getElementById("widgetContainer");
-    const bgMusic       = document.getElementById("bgMusic");
-    const nameplate     = document.getElementById("nameplate");
+    const bgMusic         = document.getElementById("bgMusic");
+    const nameplate       = document.getElementById("nameplate");
 
     // Privacy dialog
     const privacyDialog = document.getElementById("privacyDialog");
     document.getElementById("openPrivacy").addEventListener("click", () => privacyDialog.showModal());
     document.getElementById("closePrivacy").addEventListener("click", () => privacyDialog.close());
 
-    // Widget
+    // Inject ElevenLabs widget
     function injectWidget() {
       function loadScript(src, onload) {
         const s = document.createElement("script");
@@ -219,9 +219,11 @@ Contact: support@finetune.audio
       widgetContainer.classList.remove("hidden");
     }
 
-    // Web Audio for fade-out
-    bgMusic.muted = true;
-    bgMusic.volume = 0;
+    /* ====== Web Audio for background music (no fading) ====== */
+    // Use Web Audio to control output level, but DO NOT play before permission.
+    bgMusic.muted = true;    // mute element output path
+    bgMusic.volume = 0;      // safety; audio heard via Web Audio graph at 20%
+
     let audioCtx, bgGainNode, mediaElSource, primed = false;
 
     function createOrResumeCtx() {
@@ -235,33 +237,27 @@ Contact: support@finetune.audio
       if (!audioCtx) return;
       if (!bgGainNode) {
         bgGainNode = audioCtx.createGain();
-        bgGainNode.gain.value = 0.2;
+        bgGainNode.gain.value = 0.2; // fixed 20% output
       }
       if (!mediaElSource) {
         try {
           mediaElSource = audioCtx.createMediaElementSource(bgMusic);
           mediaElSource.connect(bgGainNode).connect(audioCtx.destination);
-        } catch (e) {}
+        } catch (e) {
+          // ignore if already connected (Safari throws on duplicate)
+        }
       }
     }
+
+    // IMPORTANT: prime without playing (so music only starts after permission)
     async function primeAudio() {
       try {
         await createOrResumeCtx();
         wireGraphOnce();
         try { bgMusic.load(); } catch {}
-        await bgMusic.play();
         primed = true;
       } catch {
         primed = false;
-      }
-    }
-
-    // Fade out after 15s
-    function fadeOutMusic() {
-      if (bgGainNode && audioCtx) {
-        const now = audioCtx.currentTime;
-        bgGainNode.gain.setValueAtTime(0.2, now);
-        bgGainNode.gain.linearRampToValueAtTime(0.0, now + 15);
       }
     }
 
@@ -275,22 +271,20 @@ Contact: support@finetune.audio
 
       await createOrResumeCtx();
       wireGraphOnce();
-      if (!primed) {
-        try {
-          try { bgMusic.load(); } catch {}
-          await bgMusic.play();
-          primed = true;
-        } catch {}
-      }
 
+      // Hide gate
       gate.classList.add("hidden");
+
+      // Start background video
       if (bgVideo) bgVideo.play().catch(() => {});
 
+      // Fade in nameplate after 3s
       setTimeout(() => { nameplate.classList.add("visible"); }, 3000);
 
+      // ⬇️ Play background music ONCE now that permission is granted
       bgMusic.play().catch(()=>{});
-      fadeOutMusic();
 
+      // Inject ElevenLabs widget
       injectWidget();
     }
 
@@ -300,7 +294,7 @@ Contact: support@finetune.audio
     GESTURE_EVENTS.forEach(ev => document.addEventListener(ev, primeAudio, { once: true, capture: true }));
     allowBtn.addEventListener("click", startExperience);
 
-    // ⬇️ NEW: redirect Deny button
+    // Redirect Deny button
     denyBtn.addEventListener("click", () => {
       window.location.href = "https://fraeylemaborg.nl/agenda/jubileumweekend-50-jaar-museum/";
     });
