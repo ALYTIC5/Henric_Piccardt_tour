@@ -237,7 +237,7 @@ Contact: support@finetune.audio
       if (!audioCtx) return;
       if (!bgGainNode) {
         bgGainNode = audioCtx.createGain();
-        bgGainNode.gain.value = 0.2; // fixed 20% output
+        bgGainNode.gain.value = 0.5; // fixed 20% output
       }
       if (!mediaElSource) {
         try {
