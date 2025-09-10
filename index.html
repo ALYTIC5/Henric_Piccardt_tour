@@ -181,7 +181,7 @@ Contact: support@finetune.audio
   <div class="widget-container hidden" id="widgetContainer"></div>
 
   <!-- Background music (no loop, fades out after 15s) -->
-  <audio id="bgMusic" src="BG_Lower.mp3" preload="auto" playsinline webkit-playsinline></audio>
+  <audio id="bgMusic" src="Final_Music_Piccardt.mp3" preload="auto" playsinline webkit-playsinline></audio>
 
   <script>
     const AGENT_ID = "agent_5801k4sjkgjtf5krvndp6nx9na33";
@@ -261,7 +261,7 @@ Contact: support@finetune.audio
       if (bgGainNode && audioCtx) {
         const now = audioCtx.currentTime;
         bgGainNode.gain.setValueAtTime(0.2, now);
-        bgGainNode.gain.linearRampToValueAtTime(0.0, now + 60);
+        bgGainNode.gain.linearRampToValueAtTime(0.0, now + 15);
       }
     }
 
@@ -300,7 +300,7 @@ Contact: support@finetune.audio
     GESTURE_EVENTS.forEach(ev => document.addEventListener(ev, primeAudio, { once: true, capture: true }));
     allowBtn.addEventListener("click", startExperience);
 
-
+    // ⬇️ NEW: redirect Deny button
     denyBtn.addEventListener("click", () => {
       window.location.href = "https://fraeylemaborg.nl/agenda/jubileumweekend-50-jaar-museum/";
     });
