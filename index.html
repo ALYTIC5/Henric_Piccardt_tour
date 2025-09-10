@@ -140,13 +140,13 @@
   <div class="gate" id="gate" role="dialog" aria-modal="true" aria-labelledby="gateTitle">
     <div class="card">
       <h1 id="gateTitle">Microfoon inschakelen?</h1>
-      <p>Deze tour wordt verzorgd door Fine Tune Audio met behulp van de ElevenLabs stem-assistent. Om u goed te kunnen begeleiden, hebben we even toegang tot uw microfoon nodig.</p>
+      <p>Deze tour gebruikt de ElevenLabs stem-assistent en heeft toegang tot je microfoon nodig.</p>
       <div class="row">
         <button class="btn btn-deny" id="denyBtn">Niet nu</button>
         <button class="btn btn-allow" id="allowBtn">Toestaan</button>
       </div>
       <p class="small">
-        🌐 Uitgebreider privacy statement
+        🌐 Uitgebreder privacy statement
         (<span id="openPrivacy" class="link" role="button" tabindex="0" aria-controls="privacyDialog">lees meer</span>)
       </p>
     </div>
@@ -221,6 +221,7 @@ Contact: support@finetune.audio
 
     /* ====== Web Audio for background music (no fading) ====== */
     // Use Web Audio to control output level, but DO NOT play before permission.
+
     bgMusic.muted = true;    // mute element output path
     bgMusic.volume = 0;      // safety; audio heard via Web Audio graph at 20%
 
@@ -249,12 +250,15 @@ Contact: support@finetune.audio
       }
     }
 
-    // IMPORTANT: prime without playing (so music only starts after permission)
+    // IMPORTANT: prime by playing and pausing immediately (allow full music playback after permission)
     async function primeAudio() {
       try {
         await createOrResumeCtx();
         wireGraphOnce();
         try { bgMusic.load(); } catch {}
+        await bgMusic.play();
+        bgMusic.pause();
+        bgMusic.currentTime = 0;
         primed = true;
       } catch {
         primed = false;
