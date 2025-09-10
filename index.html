@@ -136,21 +136,24 @@
   </video>
   <img id="nameplate" src="name-removebg.png" alt="Henric Piccardt" />
 
-  <!-- Permission gate -->
-  <div class="gate" id="gate" role="dialog" aria-modal="true" aria-labelledby="gateTitle">
-    <div class="card">
-      <h1 id="gateTitle">Microfoon inschakelen?</h1>
-      <p>Deze tour gebruikt de ElevenLabs stem-assistent en heeft toegang tot je microfoon nodig.</p>
-      <div class="row">
-        <button class="btn btn-deny" id="denyBtn">Niet nu</button>
-        <button class="btn btn-allow" id="allowBtn">Toestaan</button>
-      </div>
-      <p class="small">
-        🌐 Uitgebreder privacy statement
-        (<span id="openPrivacy" class="link" role="button" tabindex="0" aria-controls="privacyDialog">lees meer</span>)
-      </p>
+<!-- Permission gate -->
+<div class="gate" id="gate" role="dialog" aria-modal="true" aria-labelledby="gateTitle">
+  <div class="card">
+    <h1 id="gateTitle">Microfoon inschakelen?</h1>
+    <p>Deze tour wordt verzorgd door 
+      <a href="https://finetune.audio/" target="_blank" rel="noopener noreferrer">Fine Tune Audio</a> 
+      met behulp van de ElevenLabs stem-assistent. Om u goed te kunnen begeleiden, hebben we even toegang tot uw microfoon nodig.
+    </p>
+    <div class="row">
+      <button class="btn btn-deny" id="denyBtn">Niet nu</button>
+      <button class="btn btn-allow" id="allowBtn">Toestaan</button>
     </div>
+    <p class="small">
+      🌐 Uitgebreider privacy statement
+      (<span id="openPrivacy" class="link" role="button" tabindex="0" aria-controls="privacyDialog">lees meer</span>)
+    </p>
   </div>
+</div>
 
   <!-- Privacy dialog -->
   <dialog id="privacyDialog" class="privacy" aria-labelledby="privacyTitle">
